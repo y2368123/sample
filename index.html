@@ -246,6 +246,13 @@ input[type="number"] { padding: 6px; border-radius: 5px; background: #222; color
         <input type="radio" name="voiceMode" value="ptt" id="voicePtt" style="margin-left:16px;">
         <label for="voicePtt" style="width:auto; cursor:pointer;">수동 PTT (버튼/스페이스)</label>
     </div>
+    <div class="option-row">
+        <label>음성 트리거 단어:</label>
+        <input type="text" id="voiceTriggerInput" value="정답" maxlength="10"
+               style="width:80px; text-align:center;"
+               placeholder="정답">
+        <span style="color:#888; font-size:12px; margin-left:8px;">예) "<span id="triggerPreview">정답</span> 32"</span>
+    </div>
 
     <button onclick="startGame()">전투 시작</button>
     <button id="resetSettingsBtn" onclick="resetSettings()">↺ 설정 초기화</button>
@@ -344,9 +351,14 @@ if (SpeechRecognition) {
         const latest = e.results[e.results.length - 1];
         if (!latest.isFinal) return;
         const transcript = latest[0].transcript.trim();
-        if (!/끝[!.]*$/.test(transcript)) return;
 
-        const raw = transcript.replace(/\s*끝[!.]*$/, '').trim();
+        // 트리거 단어(기본 "정답")로 시작하는지 확인, 대소문자·공백 유연 처리
+        const trigger = (currentVoiceTrigger || '정답').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const triggerRe = new RegExp('^' + trigger + '[\\s!.]*(.+)$', 'i');
+        const match = transcript.match(triggerRe);
+        if (!match) return;
+
+        const raw = match[1].trim();
         const parsed = parseVoiceInput(raw);
         if (parsed === null) return;
 
@@ -398,7 +410,8 @@ function updateMicUI(active) {
     }
     if (active) {
         el.className = 'active';
-        el.innerHTML = '🎤 듣는 중&nbsp;&nbsp;<span style="font-size:11px;color:#ff9999;">숫자를 말하고 "끝!" 이라고 하세요</span>';
+        const tw = currentVoiceTrigger || '정답';
+        el.innerHTML = `🎤 듣는 중&nbsp;&nbsp;<span style="font-size:11px;color:#ff9999;">"${tw} 32" 형식으로 말하세요</span>`;
         if (btn) { btn.classList.add('active'); btn.textContent = '🎤 듣는 중...'; }
     } else {
         el.className = '';
@@ -686,7 +699,16 @@ const DEFAULTS = {
     bossSpawn:     '10',
     bossHp:        '5',
     voiceMode:     'auto',
+    voiceTrigger:  '정답',
 };
+
+let currentVoiceTrigger = '정답'; // 배틀 중 사용할 트리거 단어 캐시
+
+// 트리거 단어 입력 시 미리보기 실시간 반영
+document.getElementById('voiceTriggerInput').addEventListener('input', function() {
+    const preview = document.getElementById('triggerPreview');
+    if (preview) preview.textContent = this.value || '정답';
+});
 
 function saveSettings() {
     const s = {
@@ -701,6 +723,7 @@ function saveSettings() {
         bossSpawn:     document.getElementById('bossSpawnInput').value,
         bossHp:        document.getElementById('bossHpInput').value,
         voiceMode:     document.querySelector('input[name="voiceMode"]:checked').value,
+        voiceTrigger:  document.getElementById('voiceTriggerInput').value.trim() || '정답',
     };
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
 }
@@ -730,8 +753,12 @@ function loadSettings() {
     document.getElementById('gameTimeInput').value      = v('gameTime');
     document.getElementById('timeLimitInput').value     = v('timeLimit');
     document.getElementById('aoeInput').value           = v('aoe');
-    document.getElementById('bossSpawnInput').value     = v('bossSpawn');
-    document.getElementById('bossHpInput').value        = v('bossHp');
+    document.getElementById('bossSpawnInput').value    = v('bossSpawn');
+    document.getElementById('bossHpInput').value       = v('bossHp');
+    const triggerVal = v('voiceTrigger');
+    document.getElementById('voiceTriggerInput').value = triggerVal;
+    const preview = document.getElementById('triggerPreview');
+    if (preview) preview.textContent = triggerVal;
 }
 
 function resetSettings() {
@@ -748,8 +775,11 @@ function resetSettings() {
     document.getElementById('gameTimeInput').value      = DEFAULTS.gameTime;
     document.getElementById('timeLimitInput').value     = DEFAULTS.timeLimit;
     document.getElementById('aoeInput').value           = DEFAULTS.aoe;
-    document.getElementById('bossSpawnInput').value     = DEFAULTS.bossSpawn;
-    document.getElementById('bossHpInput').value        = DEFAULTS.bossHp;
+    document.getElementById('bossSpawnInput').value    = DEFAULTS.bossSpawn;
+    document.getElementById('bossHpInput').value       = DEFAULTS.bossHp;
+    document.getElementById('voiceTriggerInput').value = DEFAULTS.voiceTrigger;
+    const preview = document.getElementById('triggerPreview');
+    if (preview) preview.textContent = DEFAULTS.voiceTrigger;
 }
 
 // 페이지 로드 시 저장된 설정 적용
@@ -760,6 +790,7 @@ function startGame() {
     gameRemainTime = parseFloat(document.getElementById("gameTimeInput").value) * 60;
 
     voiceModeAuto = document.querySelector('input[name="voiceMode"]:checked').value === 'auto';
+    currentVoiceTrigger = document.getElementById('voiceTriggerInput').value.trim() || '정답';
     saveSettings(); // 전투 시작 시점의 설정을 localStorage에 저장
 
     savedSettings = {
