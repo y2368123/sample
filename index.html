@@ -106,6 +106,11 @@ input[type="number"] { padding: 6px; border-radius: 5px; background: #222; color
     font-size: clamp(11px, 2.5vw, 13px); min-height: 18px; margin-bottom: 4px; color: #555;
 }
 #micStatus.active { color: #ff8888; animation: micPulse 1.4s ease-in-out infinite; }
+#micTranscript {
+    font-size: clamp(12px, 2.8vw, 15px); min-height: 20px; margin-bottom: 6px;
+    color: #aaa; font-style: italic;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 @keyframes micPulse { 0%,100%{opacity:1} 50%{opacity:0.45} }
 #micTalkBtn {
     background: #1a3a6a; border: 2px solid #3a6aaa; color: white;
@@ -126,6 +131,36 @@ input[type="number"] { padding: 6px; border-radius: 5px; background: #222; color
 }
 #timerBarContainer { width: 100%; height: clamp(8px, 2vw, 15px); background: #400; margin-top: 16px; border-radius: 10px; overflow: hidden; }
 #timerBar { height: 100%; background: red; width: 100%; transition: width 0.05s linear; }
+
+/* ── 보기 선택 모드 ── */
+#choicesContainer {
+    display: none;
+    grid-template-columns: repeat(6, 1fr);
+    gap: clamp(6px, 1.5vw, 10px);
+    margin-top: 10px;
+    width: min(480px, 100%);
+    margin-left: auto; margin-right: auto;
+}
+#choicesContainer.active { display: grid; }
+.choice-btn {
+    grid-column: span 2;
+    padding: clamp(8px, 2.5vw, 14px) 4px;
+    font-size: clamp(18px, 5vw, 30px);
+    font-weight: bold;
+    border: 2px solid #555; border-radius: 10px;
+    background: #1a1a3a; color: white;
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s, transform 0.08s;
+    user-select: none; -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+.choice-btn:hover  { background: #25254a; border-color: #999; }
+.choice-btn:active { transform: scale(0.94); }
+.choice-btn.correct { background: #0a3a0a; border-color: #0f0; color: #0f0; pointer-events: none; }
+.choice-btn.wrong   { background: #3a0a0a; border-color: #f44; color: #f44; pointer-events: none; }
+/* 4~5번째: 각 3칸 → 두 번째 줄에 2개 균등 배치 */
+.choice-btn:nth-child(4),
+.choice-btn:nth-child(5) { grid-column: span 3; }
 
 /* ── 게임 오버 모달 ── */
 #gameOverModal {
@@ -240,18 +275,32 @@ input[type="number"] { padding: 6px; border-radius: 5px; background: #222; color
     </div>
 
     <div class="option-row">
-        <label>음성인식 방식:</label>
-        <input type="radio" name="voiceMode" value="auto" id="voiceAuto" checked>
-        <label for="voiceAuto" style="width:auto; cursor:pointer;">자동 (배틀 내내)</label>
-        <input type="radio" name="voiceMode" value="ptt" id="voicePtt" style="margin-left:16px;">
-        <label for="voicePtt" style="width:auto; cursor:pointer;">수동 PTT (버튼/스페이스)</label>
+        <label>입력 방식:</label>
+        <input type="radio" name="inputMode" value="type" id="inputType" checked>
+        <label for="inputType" style="width:auto; cursor:pointer;">직접 입력</label>
+        <input type="radio" name="inputMode" value="choices" id="inputChoices" style="margin-left:16px;">
+        <label for="inputChoices" style="width:auto; cursor:pointer;">📱 보기 선택</label>
     </div>
+
     <div class="option-row">
-        <label>음성 트리거 단어:</label>
-        <input type="text" id="voiceTriggerInput" value="정답" maxlength="10"
-               style="width:80px; text-align:center;"
-               placeholder="정답">
-        <span style="color:#888; font-size:12px; margin-left:8px;">예) "<span id="triggerPreview">정답</span> 32"</span>
+        <label>음성인식:</label>
+        <input type="checkbox" id="voiceEnabledCheck" onchange="toggleVoiceOptions(this.checked)" style="width:auto; cursor:pointer;">
+        <label for="voiceEnabledCheck" style="width:auto; cursor:pointer; margin-left:4px;">사용</label>
+    </div>
+    <div id="voiceOptions" style="display:none;">
+        <div class="option-row" style="padding-left:12px;">
+            <label>인식 방식:</label>
+            <input type="radio" name="voiceMode" value="auto" id="voiceAuto" checked>
+            <label for="voiceAuto" style="width:auto; cursor:pointer;">자동</label>
+            <input type="radio" name="voiceMode" value="ptt" id="voicePtt" style="margin-left:16px;">
+            <label for="voicePtt" style="width:auto; cursor:pointer;">PTT (버튼/스페이스)</label>
+        </div>
+        <div class="option-row" style="padding-left:12px;">
+            <label>트리거 단어:</label>
+            <input type="text" id="voiceTriggerInput" value="정답" maxlength="10"
+                   style="width:80px; text-align:center;" placeholder="정답">
+            <span style="color:#888; font-size:12px; margin-left:8px;">예) "<span id="triggerPreview">정답</span> 32"</span>
+        </div>
     </div>
 
     <button onclick="startGame()">전투 시작</button>
@@ -259,6 +308,7 @@ input[type="number"] { padding: 6px; border-radius: 5px; background: #222; color
 </div>
 
 <div id="battleUI">
+    <div id="micTranscript"></div>
     <div id="bossSection" style="display:none">
         <img id="bossImage" src="">
         <div id="bossHpBarContainer"><div id="bossHpBar"></div></div>
@@ -268,6 +318,7 @@ input[type="number"] { padding: 6px; border-radius: 5px; background: #222; color
     <div id="problem"></div>
     <div id="hint"></div>
     <input id="answerInput" type="text" autocomplete="off" placeholder="정답 입력">
+    <div id="choicesContainer"></div>
     <button id="micTalkBtn" type="button" onclick="pttActivate()" style="display:none;">🎤 말하기 (Space)</button>
     <div id="timerBarContainer"><div id="timerBar"></div></div>
 </div>
@@ -313,7 +364,10 @@ let savedSettings = null;
 // 브라우저 내장 API 사용. Chrome/Edge 지원. 별도 라이브러리 불필요.
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let voiceRecognition = null;
-let speechActive = false; // true인 동안 onend에서 자동 재시작
+let speechActive = false;      // true인 동안 onend에서 자동 재시작
+let speechStopping = false;    // stopSpeechRecognition()이 명시적으로 stop했을 때 true
+let lastInterimTranscript = ''; // PTT 모드에서 final 전 마지막 interim 보존
+let pttFinalProcessed = false;  // PTT 세션에서 final 결과가 처리됐는지 여부
 
 // 음성인식 모드: 'auto' = 배틀 내내 연속 녹음, 'ptt' = 버튼/스페이스 누를 때만
 let voiceModeAuto = true; // startGame()에서 설정값으로 갱신
@@ -321,18 +375,51 @@ let voiceModeAuto = true; // startGame()에서 설정값으로 갱신
 if (SpeechRecognition) {
     voiceRecognition = new SpeechRecognition();
     voiceRecognition.lang = 'ko-KR';
-    voiceRecognition.interimResults = false;
-    voiceRecognition.maxAlternatives = 1;
+    voiceRecognition.interimResults = true;
+    voiceRecognition.maxAlternatives = 3;
+
+    // 숫자 단어 문법 힌트 — Chrome에게 인식 후보를 좁혀줌
+    const SpeechGrammarList = window.SpeechGrammarList || window.webkitSpeechGrammarList;
+    if (SpeechGrammarList) {
+        const nums = '영 공 제로 일 하나 한 이 둘 두 삼 셋 세 사 넷 네 오 다섯 육 여섯 칠 일곱 팔 여덟 구 아홉 ' +
+                     '십 열 이십 스물 삼십 서른 사십 마흔 오십 쉰 육십 예순 칠십 일흔 팔십 여든 구십 아흔 백';
+        const grammar = '#JSGF V1.0 UTF-8 ko; grammar numbers; public <number> = ' + nums.split(' ').join(' | ') + ';';
+        const list = new SpeechGrammarList();
+        list.addFromString(grammar, 1);
+        voiceRecognition.grammars = list;
+    }
 
     voiceRecognition.onstart = () => { speechActive = true; updateMicUI(true); };
 
     voiceRecognition.onend = () => {
         speechActive = false;
         updateMicUI(false);
+
+        // PTT 모드: final 없이 세션이 끝났으면 마지막 interim으로 처리 시도 (한음절 대응)
+        if (!voiceModeAuto && !speechStopping && !pttFinalProcessed && lastInterimTranscript) {
+            const raw = lastInterimTranscript;
+            lastInterimTranscript = '';
+            const transcriptEl = document.getElementById('micTranscript');
+            if (transcriptEl) {
+                transcriptEl.textContent = '🎤 "' + raw + '"';
+                clearTimeout(transcriptEl._clearTimer);
+                transcriptEl._clearTimer = setTimeout(() => { transcriptEl.textContent = ''; }, 3000);
+            }
+            const parsed = parseVoiceInput(raw);
+            if (parsed !== null) {
+                document.getElementById('answerInput').value = parsed;
+                if (parsed === correctAnswer) { endBattle(true); } else { document.getElementById('answerInput').value = ''; endBattle(false); }
+            }
+        }
+        lastInterimTranscript = '';
+        pttFinalProcessed = false;
+
+        // 명시적 stop이면 재시작하지 않음
+        if (speechStopping) { speechStopping = false; return; }
         // Auto 모드: 배틀이 진행 중이면 자동 재시작 (발화 사이 끊김 방지)
         if (voiceModeAuto && battleMode) {
             setTimeout(() => {
-                if (voiceModeAuto && battleMode && !speechActive) {
+                if (voiceModeAuto && battleMode && !speechActive && !speechStopping) {
                     try { voiceRecognition.start(); } catch(e) {}
                 }
             }, 200);
@@ -348,41 +435,91 @@ if (SpeechRecognition) {
     };
 
     voiceRecognition.onresult = (e) => {
-        const latest = e.results[e.results.length - 1];
-        if (!latest.isFinal) return;
-        const transcript = latest[0].transcript.trim();
-
-        // 트리거 단어(기본 "정답")로 시작하는지 확인, 대소문자·공백 유연 처리
+        const transcriptEl = document.getElementById('micTranscript');
         const trigger = (currentVoiceTrigger || '정답').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const triggerRe = new RegExp('^' + trigger + '[\\s!.]*(.+)$', 'i');
-        const match = transcript.match(triggerRe);
-        if (!match) return;
 
-        const raw = match[1].trim();
-        const parsed = parseVoiceInput(raw);
-        if (parsed === null) return;
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+            const result = e.results[i];
+            const text = result[0].transcript.trim();
 
-        document.getElementById('answerInput').value = parsed;
-        if (parsed === correctAnswer) {
-            endBattle(true);
-        } else {
-            document.getElementById('answerInput').value = '';
-            endBattle(false);
+            if (!result.isFinal) {
+                // interim: 패널에 실시간 표시, PTT용으로 저장
+                lastInterimTranscript = text;
+                if (transcriptEl) {
+                    transcriptEl.textContent = '🎤 "' + text + '" ...';
+                    clearTimeout(transcriptEl._clearTimer);
+                }
+                // Auto 모드: interim이라도 트리거+숫자가 확인되면 즉시 처리 (짧은 단어 대응)
+                if (voiceModeAuto) {
+                    const match = text.match(triggerRe);
+                    if (match) {
+                        const parsed = parseVoiceInput(match[1].trim());
+                        if (parsed !== null) {
+                            lastInterimTranscript = '';
+                            pttFinalProcessed = true;
+                            if (transcriptEl) {
+                                transcriptEl.textContent = '🎤 "' + text + '"';
+                                transcriptEl._clearTimer = setTimeout(() => { transcriptEl.textContent = ''; }, 3000);
+                            }
+                            document.getElementById('answerInput').value = parsed;
+                            if (parsed === correctAnswer) { endBattle(true); } else { document.getElementById('answerInput').value = ''; endBattle(false); }
+                        }
+                    }
+                }
+                continue;
+            }
+
+            // final 결과 처리
+            lastInterimTranscript = '';
+            pttFinalProcessed = true;
+            if (transcriptEl) {
+                transcriptEl.textContent = '🎤 "' + text + '"';
+                clearTimeout(transcriptEl._clearTimer);
+                transcriptEl._clearTimer = setTimeout(() => { transcriptEl.textContent = ''; }, 3000);
+            }
+
+            // 후보를 순서대로 시도해 파싱 성공하면 사용
+            let parsed = null;
+            for (let j = 0; j < result.length; j++) {
+                const t = result[j].transcript.trim();
+                let raw;
+                if (voiceModeAuto) {
+                    const match = t.match(triggerRe);
+                    if (!match) continue;
+                    raw = match[1].trim();
+                } else {
+                    raw = t;
+                }
+                parsed = parseVoiceInput(raw);
+                if (parsed !== null) break;
+            }
+            if (parsed === null) continue;
+
+            document.getElementById('answerInput').value = parsed;
+            if (parsed === correctAnswer) {
+                endBattle(true);
+            } else {
+                document.getElementById('answerInput').value = '';
+                endBattle(false);
+            }
         }
     };
 }
 
 function startSpeechRecognition() {
     if (!voiceRecognition || speechActive) return;
-    // 모드에 따라 continuous 설정
-    voiceRecognition.continuous = voiceModeAuto;
+    // continuous = false 고정: Chrome에서 continuous=true는 불안정
+    // 자동 모드는 onend에서 즉시 재시작해 연속 인식을 구현
+    voiceRecognition.continuous = false;
     try { voiceRecognition.start(); } catch(e) {}
 }
 
 function stopSpeechRecognition() {
+    speechStopping = true;
     speechActive = false;
     updateMicUI(false);
-    try { voiceRecognition.stop(); } catch(e) {}
+    try { voiceRecognition.stop(); } catch(e) { speechStopping = false; }
 }
 
 // PTT 모드 전용: 스페이스바 또는 버튼으로 1회 인식 시작
@@ -421,6 +558,128 @@ function updateMicUI(active) {
             el.innerHTML = '🎤 <span style="color:#888;">스페이스 또는 아래 버튼으로 말하기</span>';
         }
         if (btn) { btn.classList.remove('active'); btn.textContent = '🎤 말하기 (Space)'; }
+    }
+}
+
+// ── 보기 선택 모드: 오답 보기 생성 ──────────────────────────────────
+// 전략: 연산 실수(사칙 혼동), 올림/내림 실수, 자릿수 뒤바꿈, ±소수 변형
+let lastProblemA = 0, lastProblemB = 0, lastProblemOp = '+';
+
+function generateDistractors(correct, a, b, op) {
+    const isRem = correct.includes('...');
+    const pool = [];
+
+    if (isRem) {
+        const [q, r] = correct.split('...').map(Number);
+        // 몫 변형
+        for (const d of [-2, -1, 1, 2]) { if (q + d >= 0) pool.push(`${q+d}...${r}`); }
+        // 나머지 변형 (0 이상, 제수 미만)
+        for (const d of [-1, 1]) { const nr = r + d; if (nr >= 0 && nr < b) pool.push(`${q}...${nr}`); }
+        // 몫↔나머지 뒤바꿈
+        if (r !== q) pool.push(`${r}...${q}`);
+        // 나머지 0 또는 최대값 착각
+        if (r !== 0) pool.push(`${q}...0`);
+        if (r !== b - 1 && b - 1 > 0) pool.push(`${q}...${b-1}`);
+    } else {
+        const c = parseInt(correct);
+
+        // 1. ±소수 변형 (가장 흔한 계산 실수)
+        for (const d of [-3, -2, -1, 1, 2, 3]) { if (c + d >= 0) pool.push(c + d); }
+
+        // 2. 올림·내림 실수 (±10)
+        if (c - 10 >= 0) pool.push(c - 10);
+        if (c + 10 <= 999) pool.push(c + 10);
+
+        // 3. 사칙 혼동
+        if (op === '+') {
+            pool.push(Math.abs(a - b));           // 덧셈→뺄셈
+            if (a * b <= 300) pool.push(a * b);   // 덧셈→곱셈
+        } else if (op === '-') {
+            pool.push(a + b);                     // 뺄셈→덧셈
+            if (b - a >= 0) pool.push(b - a);     // 피감수·감수 뒤집기
+        } else if (op === '×') {
+            pool.push(a + b);                     // 곱셈→덧셈
+            if (c - b >= 0) pool.push(c - b);     // (a-1)×b
+            if (c + b <= 999) pool.push(c + b);   // (a+1)×b
+            if (c - a >= 0) pool.push(c - a);     // a×(b-1)
+            if (c + a <= 999) pool.push(c + a);   // a×(b+1)
+        } else if (op === '÷') {
+            pool.push(a - b >= 0 ? a - b : a + b); // 나눗셈→뺄셈
+            pool.push(c + 1); pool.push(c - 1 >= 0 ? c - 1 : c + 2);
+        }
+
+        // 4. 자릿수 뒤바꿈 (2자리)
+        if (c >= 10 && c <= 99) {
+            const t = Math.floor(c / 10), o = c % 10;
+            if (t !== o) pool.push(o * 10 + t);
+        }
+        // 5. 올림 무시 실수: 일의 자리끼리만 계산한 값
+        if (op === '+') {
+            const onesOnly = (a % 10) + (b % 10);
+            if (onesOnly !== c && onesOnly >= 0) pool.push(onesOnly);
+        }
+    }
+
+    // 중복 제거, 정답 제외, 음수 제외
+    const seen = new Set([correct]);
+    const valid = [];
+    for (const v of pool) {
+        const s = String(v);
+        if (!seen.has(s) && !s.startsWith('-')) { seen.add(s); valid.push(s); }
+    }
+
+    // 셔플
+    for (let i = valid.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [valid[i], valid[j]] = [valid[j], valid[i]];
+    }
+
+    // 4개 확보 (부족하면 ±offset으로 채움)
+    const result = valid.slice(0, 4);
+    let offset = 4;
+    while (result.length < 4 && offset < 100) {
+        const base = isRem ? parseInt(correct.split('...')[0]) : parseInt(correct);
+        const cand = String(base + offset);
+        if (!seen.has(cand)) { result.push(cand); seen.add(cand); }
+        offset++;
+    }
+    return result;
+}
+
+function renderChoices(correct, a, b, op) {
+    const container = document.getElementById('choicesContainer');
+    if (!container) return;
+    const distractors = generateDistractors(correct, a, b, op);
+    const all = [correct, ...distractors];
+    // 셔플
+    for (let i = all.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [all[i], all[j]] = [all[j], all[i]];
+    }
+    container.innerHTML = '';
+    for (const val of all) {
+        const btn = document.createElement('button');
+        btn.className = 'choice-btn';
+        btn.textContent = val;
+        btn.onclick = () => handleChoice(btn, val);
+        container.appendChild(btn);
+    }
+    container.classList.add('active');
+}
+
+function handleChoice(btn, val) {
+    if (!battleMode) return;
+    document.getElementById('answerInput').value = val;
+    if (val === correctAnswer) {
+        btn.classList.add('correct');
+        setTimeout(() => endBattle(true), 300);
+    } else {
+        btn.classList.add('wrong');
+        setTimeout(() => {
+            btn.classList.remove('wrong');
+            document.getElementById('answerInput').value = '';
+        }, 500);
+        endBattle(false);
     }
 }
 
@@ -698,11 +957,19 @@ const DEFAULTS = {
     aoe:           '10',
     bossSpawn:     '10',
     bossHp:        '5',
+    inputMode:     'type',
+    voiceEnabled:  false,
     voiceMode:     'auto',
     voiceTrigger:  '정답',
 };
 
 let currentVoiceTrigger = '정답'; // 배틀 중 사용할 트리거 단어 캐시
+let voiceEnabled = false;         // 음성인식 사용 여부
+let inputMode = 'type';           // 'type' | 'choices'
+
+function toggleVoiceOptions(checked) {
+    document.getElementById('voiceOptions').style.display = checked ? '' : 'none';
+}
 
 // 트리거 단어 입력 시 미리보기 실시간 반영
 document.getElementById('voiceTriggerInput').addEventListener('input', function() {
@@ -722,6 +989,8 @@ function saveSettings() {
         aoe:           document.getElementById('aoeInput').value,
         bossSpawn:     document.getElementById('bossSpawnInput').value,
         bossHp:        document.getElementById('bossHpInput').value,
+        inputMode:     document.querySelector('input[name="inputMode"]:checked').value,
+        voiceEnabled:  document.getElementById('voiceEnabledCheck').checked,
         voiceMode:     document.querySelector('input[name="voiceMode"]:checked').value,
         voiceTrigger:  document.getElementById('voiceTriggerInput').value.trim() || '정답',
     };
@@ -734,8 +1003,12 @@ function loadSettings() {
     catch(e) { s = {}; }
     const v = k => s[k] ?? DEFAULTS[k];
 
-    // 라디오
+    // 라디오 / 체크박스
     document.querySelector(`input[name="mathLayout"][value="${v('mathLayout')}"]`).checked = true;
+    document.querySelector(`input[name="inputMode"][value="${v('inputMode')}"]`).checked = true;
+    const voiceEn = v('voiceEnabled');
+    document.getElementById('voiceEnabledCheck').checked = voiceEn;
+    document.getElementById('voiceOptions').style.display = voiceEn ? '' : 'none';
     document.querySelector(`input[name="voiceMode"][value="${v('voiceMode')}"]`).checked = true;
 
     // 연산 종류 → 세부 난이도 목록을 먼저 갱신한 뒤 선택
@@ -765,6 +1038,9 @@ function resetSettings() {
     localStorage.removeItem(SETTINGS_KEY);
     // 기본값으로 DOM 복원
     document.querySelector('input[name="mathLayout"][value="horizontal"]').checked = true;
+    document.querySelector('input[name="inputMode"][value="type"]').checked = true;
+    document.getElementById('voiceEnabledCheck').checked = false;
+    document.getElementById('voiceOptions').style.display = 'none';
     document.querySelector('input[name="voiceMode"][value="auto"]').checked = true;
     document.getElementById('opTypeSelect').value = 'add';
     updateSubOptions();
@@ -789,6 +1065,8 @@ function startGame() {
     monsterMoveSpeed = parseFloat(document.getElementById("speedSlider").value);
     gameRemainTime = parseFloat(document.getElementById("gameTimeInput").value) * 60;
 
+    inputMode     = document.querySelector('input[name="inputMode"]:checked').value;
+    voiceEnabled  = document.getElementById('voiceEnabledCheck').checked;
     voiceModeAuto = document.querySelector('input[name="voiceMode"]:checked').value === 'auto';
     currentVoiceTrigger = document.getElementById('voiceTriggerInput').value.trim() || '정답';
     saveSettings(); // 전투 시작 시점의 설정을 localStorage에 저장
@@ -854,14 +1132,17 @@ function generateProblem() {
     } else {
         op = '÷';
         if (subIdx <= 2) {
-            // case 0,1,2 → 나머지 없음
             correctAnswer = (a / b).toString();
         } else {
-            // case 3,4,5 → 나머지 있음
             correctAnswer = `${Math.floor(a / b)}...${a % b}`;
             document.getElementById("hint").innerText = "몫...나머지 입력 (예: 7...2)";
         }
     }
+
+    lastProblemA = a; lastProblemB = b; lastProblemOp = op;
+
+    // 보기 선택 모드: 선택지 렌더링
+    if (inputMode === 'choices') renderChoices(correctAnswer, a, b, op);
 
     if (layout === 'vertical' && main !== 'div') {
         const maxLen = Math.max(a.toString().length, b.toString().length);
@@ -883,8 +1164,19 @@ function startBattle(m) {
     battleStart = Date.now();
     document.getElementById("wrongFeedback").innerText = "";
     document.getElementById("battleUI").style.display = "block";
-    document.getElementById("answerInput").value = "";
-    document.getElementById("answerInput").focus();
+
+    // 입력 방식 분기
+    const answerInput = document.getElementById("answerInput");
+    const choicesCont = document.getElementById("choicesContainer");
+    if (inputMode === 'choices') {
+        answerInput.style.display = 'none';
+        // choicesContainer는 generateProblem → renderChoices에서 이미 채워짐
+    } else {
+        answerInput.style.display = '';
+        choicesCont.classList.remove('active');
+        answerInput.value = "";
+        answerInput.focus();
+    }
     if (m.boss) {
         document.getElementById("bossSection").style.display = "block";
         document.getElementById("bossImage").src = m.img.src;
@@ -893,13 +1185,23 @@ function startBattle(m) {
         document.getElementById("bossSection").style.display = "none";
     }
     startBattleTimer();
-    // Auto: 배틀 시작 시 자동 ON / PTT: 버튼 표시만, 마이크는 사용자가 직접 켬
-    if (voiceModeAuto) {
-        startSpeechRecognition();
+    // 음성인식 ON일 때만 마이크 시작
+    const micStatus = document.getElementById('micStatus');
+    const micTranscript = document.getElementById('micTranscript');
+    const micTalkBtn = document.getElementById('micTalkBtn');
+    if (voiceEnabled) {
+        if (micStatus) micStatus.style.display = '';
+        if (micTranscript) micTranscript.style.display = '';
+        if (voiceModeAuto) {
+            startSpeechRecognition();
+        } else {
+            updateMicUI(false);
+            if (micTalkBtn && voiceRecognition) micTalkBtn.style.display = '';
+        }
     } else {
-        updateMicUI(false); // PTT 안내 문구 + 버튼 표시
-        const btn = document.getElementById('micTalkBtn');
-        if (btn && voiceRecognition) btn.style.display = '';
+        if (micStatus) micStatus.style.display = 'none';
+        if (micTranscript) micTranscript.style.display = 'none';
+        if (micTalkBtn) micTalkBtn.style.display = 'none';
     }
 }
 
@@ -956,14 +1258,22 @@ function endBattle(success) {
 
         if (playerHp <= 0) { endGame("게임 오버!"); return; }
 
-        // UX #6: 오답 피드백 표시 - 같은 몬스터로 새 문제 계속 진행
+        // 오답: HP만 깎고 같은 문제 계속 진행
         document.getElementById("wrongFeedback").innerText = "오답! 다시 시도하세요";
         setTimeout(() => { document.getElementById("wrongFeedback").innerText = ""; }, 1500);
 
-        generateProblem();
+        // 보기 선택 모드: 선택지 유지 (오답 버튼 강조만 초기화)
+        if (inputMode === 'choices') {
+            document.querySelectorAll('.choice-btn.wrong').forEach(b => {
+                b.classList.remove('wrong');
+                b.style.pointerEvents = '';
+            });
+        } else {
+            document.getElementById("answerInput").value = "";
+            document.getElementById("answerInput").focus();
+        }
         battleStart = Date.now();
         startBattleTimer();
-        document.getElementById("answerInput").value = "";
     }
 }
 
@@ -990,6 +1300,12 @@ function finishBattle() {
     document.getElementById("battleUI").style.display = "none";
     const btn = document.getElementById('micTalkBtn');
     if (btn) btn.style.display = 'none';
+    // 보기 초기화
+    const cc = document.getElementById('choicesContainer');
+    if (cc) { cc.classList.remove('active'); cc.innerHTML = ''; }
+    // 직접입력 복원
+    const ai = document.getElementById('answerInput');
+    if (ai) ai.style.display = '';
     setTimeout(() => { battleMode = false; }, 300);
 }
 
