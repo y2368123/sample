@@ -197,8 +197,18 @@ input[type="number"] { padding: 6px; border-radius: 5px; background: #222; color
  background: #1a1a2e; border: 2px solid #e94560;
  border-radius: 20px; padding: clamp(24px, 6vw, 50px) clamp(20px, 7vw, 60px);
  text-align: center; color: white;
- width: min(440px, 96vw);
+ width: min(480px, 96vw);
+ max-height: 90vh; overflow-y: auto;
 }
+#rankingSection { margin-top: 16px; text-align: left; }
+#rankingSection h3 { color: #ffd700; font-size: 14px; text-align: center; margin: 0 0 8px; letter-spacing: 1px; }
+#rankingTable { width: 100%; border-collapse: collapse; font-size: 12px; }
+#rankingTable th { color: #777; padding: 4px 5px; border-bottom: 1px solid #333; font-weight: normal; }
+#rankingTable td { padding: 5px 5px; border-bottom: 1px solid #1e1e30; }
+#rankingTable tr.my-rank td { background: rgba(255,215,0,0.07); font-weight: bold; }
+#rankingTable tr.my-rank td:first-child { color: #ff6b6b; }
+#rankingTable tr.my-rank td:nth-child(3) { color: #ffd700; }
+#rankNoEntry { color: #444; text-align: center; font-size: 13px; padding: 10px 0; }
 #gameOverTitle { font-size: clamp(28px, 8vw, 46px); font-weight: bold; margin-bottom: 8px; }
 #gameOverScore { font-size: clamp(24px, 7vw, 38px); color: #ffd700; margin: 14px 0 8px; }
 #gameOverStats { font-size: clamp(13px, 3vw, 18px); color: #aaa; margin-bottom: 24px; }
@@ -233,7 +243,7 @@ input[type="number"] { padding: 6px; border-radius: 5px; background: #222; color
     <div id="hpArea">
         <div id="hpContainer"><div id="hpBar"></div><div id="hpPercentText">100%</div></div>
         <div id="inGameBtns">
-            <button class="ingame-btn" onclick="endGame('메인메뉴')">🏠 메인</button>
+            <button class="ingame-btn" onclick="endGame('메인메뉴', true)">🏠 메인</button>
         </div>
     </div>
     <div id="scoreArea" style="text-align: right;">
@@ -244,6 +254,11 @@ input[type="number"] { padding: 6px; border-radius: 5px; background: #222; color
 
 <div id="startScreen" class="centerUI">
     <h1 style="color:#44ff44; margin-top:0;">슬라임 수학대전</h1>
+
+    <div class="option-row">
+        <label>닉네임:</label>
+        <input type="text" id="nicknameInput" maxlength="12" placeholder="익명" style="width:120px; text-align:left;">
+    </div>
 
     <div class="option-row">
         <label>문제 형식:</label>
@@ -330,6 +345,7 @@ input[type="number"] { padding: 6px; border-radius: 5px; background: #222; color
     </div>
 
     <button onclick="startGame()">전투 시작</button>
+    <button onclick="showRankingView()" style="background:#7b4f00; color:#ffd700;">🏆 랭킹 보기</button>
     <button id="resetSettingsBtn" onclick="resetSettings()">↺ 설정 초기화</button>
 </div>
 
@@ -349,13 +365,26 @@ input[type="number"] { padding: 6px; border-radius: 5px; background: #222; color
     <div id="timerBarContainer"><div id="timerBar"></div></div>
 </div>
 
+<!-- 랭킹 뷰 모달 -->
+<div id="rankingViewModal" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.92); z-index:30; justify-content:center; align-items:center; padding:16px;">
+    <div style="background:#1a1a2e; border:2px solid #ffd700; border-radius:20px; padding:28px 24px; width:min(500px,96vw); max-height:90vh; overflow-y:auto; color:white; text-align:center;">
+        <div style="font-size:20px; font-weight:bold; color:#ffd700; margin-bottom:6px;">🏆 랭킹</div>
+        <div id="rankingViewKeyLabel" style="font-size:12px; color:#666; margin-bottom:14px; word-break:break-all;"></div>
+        <div id="rankingViewBody"></div>
+        <button class="modal-btn" onclick="resetCurrentRanking()" style="background:#5a1a1a; color:#f88; margin-top:16px;">🗑 이 설정 랭킹 초기화</button>
+        <button class="modal-btn" onclick="document.getElementById('rankingViewModal').style.display='none'" style="background:#444; color:#ccc; margin-top:8px;">닫기</button>
+    </div>
+</div>
+
 <!-- UX #9: 게임 오버 모달 -->
 <div id="gameOverModal">
     <div id="gameOverBox">
         <div id="gameOverTitle">게임 종료</div>
         <div id="gameOverScore">SCORE: 0</div>
         <div id="gameOverStats"></div>
-        <button class="modal-btn" id="continueBtn" onclick="continueGame()" style="background:#1a6aaa;">계속 진행하기</button>
+        <div id="myRankBadge" style="font-size:14px; color:#aaa; margin-bottom:4px;"></div>
+        <div id="rankingSection"><div id="rankNoEntry">기록 없음</div></div>
+        <button class="modal-btn" id="continueBtn" onclick="continueGame()" style="background:#1a6aaa; margin-top:16px;">계속 진행하기</button>
         <button class="modal-btn" id="restartBtn" onclick="restartGame()">다시 시작 (같은 설정)</button>
         <button class="modal-btn" id="mainMenuBtn" onclick="location.reload()">처음 화면으로</button>
     </div>
@@ -384,6 +413,8 @@ let killCount = 0, totalKillCount = 0, bossActive = false, score = 0, playerHp =
 let gameRemainTime = 60, mainClock = null, monsterMoveSpeed = 4;
 // Bug #4: 게임 실행 상태 플래그 - spawnLoop 정지에 사용
 let gameRunning = false;
+let gameEnded = false;    // endGame 중복 호출 방지
+let rankingSaved = false; // 세션당 랭킹 1회 저장 (계속 진행 후 중복 방지)
 // 재시작용 설정 저장
 let savedSettings = null;
 
@@ -820,9 +851,9 @@ function buildPool(main, subIdx) {
     }
     else if (main === 'sub') {
         switch (subIdx) {
-            case 0: // 한자리 뺄셈
+            case 0: // 한자리 뺄셈 (답이 0인 경우 제외)
                 for (let a = 2; a <= 9; a++)
-                    for (let b = 1; b <= a; b++)
+                    for (let b = 1; b < a; b++)
                         pairs.push([a, b]);
                 break;
             case 1: // 내림 없는 2-1: b ≤ a의 일의자리
@@ -975,6 +1006,112 @@ updateSubOptions();
 
 // ── 설정 저장/불러오기 (localStorage) ────────────────────────────────
 const SETTINGS_KEY = 'mathgame_settings';
+const RANKING_KEY  = 'mathgame_rankings';
+// 랭킹 키에 포함할 설정 항목 (난이도에 영향 주는 것만)
+const RANK_SETTING_KEYS = ['opType','subType','speed','spawnInterval','gameTime','timeLimit','aoe','bossSpawn','bossHp','inputMode'];
+
+function getRankKey(s) {
+    return RANK_SETTING_KEYS.map(k => `${k}:${s[k]}`).join('|');
+}
+
+// 랭킹 저장. 저장 후 내 항목의 인덱스(0-based) 반환. 10위권 밖이면 -1.
+function saveRanking(rankKey, score, kills, nickname) {
+    let all;
+    try { all = JSON.parse(localStorage.getItem(RANKING_KEY)) || {}; }
+    catch(e) { all = {}; }
+    const list = all[rankKey] || [];
+    const _d = new Date(), _p = n => String(n).padStart(2,'0');
+    const dateStr = `${_d.getFullYear().toString().slice(2)}.${_p(_d.getMonth()+1)}.${_p(_d.getDate())} ${_p(_d.getHours())}:${_p(_d.getMinutes())}`;
+    const entry = { score, kills, nickname: (nickname || '익명').trim() || '익명', date: dateStr };
+    list.push(entry);
+    list.sort((a, b) => b.score - a.score);
+    const top10 = list.slice(0, 10);
+    const myIdx = top10.indexOf(entry); // 10위권 밖이면 -1
+    all[rankKey] = top10;
+    localStorage.setItem(RANKING_KEY, JSON.stringify(all));
+    return myIdx;
+}
+
+function getRankings(rankKey) {
+    let all;
+    try { all = JSON.parse(localStorage.getItem(RANKING_KEY)) || {}; }
+    catch(e) { all = {}; }
+    return all[rankKey] || [];
+}
+
+function renderRankingTable(rankKey, myIdx) {
+    const list = getRankings(rankKey);
+    if (!list.length) return '<div id="rankNoEntry">기록 없음</div>';
+    const medals = ['🥇','🥈','🥉'];
+    const rows = list.map((r, i) => {
+        const rank = medals[i] || `${i+1}위`;
+        const cls  = i === myIdx ? ' class="my-rank"' : '';
+        return `<tr${cls}>
+            <td style="text-align:center;width:36px;">${rank}</td>
+            <td>${r.nickname}</td>
+            <td style="text-align:right;color:#ffd700;">${r.score.toLocaleString()}</td>
+            <td style="text-align:right;color:#aaa;">${r.kills}킬</td>
+            <td style="text-align:right;color:#555;font-size:11px;">${r.date}</td>
+        </tr>`;
+    }).join('');
+    return `<h3>🏆 이 설정 TOP 10</h3>
+    <table id="rankingTable">
+        <thead><tr>
+            <th style="text-align:center;">순위</th><th>닉네임</th>
+            <th style="text-align:right;">점수</th><th style="text-align:right;">킬</th>
+            <th style="text-align:right;">날짜/시간</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function getRankKeyLabel(s) {
+    const opNames = { add:'덧셈', sub:'뺄셈', mul:'곱셈', div:'나눗셈' };
+    const inputNames = { type:'직접입력', choices:'보기선택' };
+    return [
+        opNames[s.opType] || s.opType,
+        `난이도 ${parseInt(s.subType)+1}`,
+        `속도 ${s.speed}`,
+        `생성 ${s.spawnInterval}s`,
+        `게임시간 ${s.gameTime}분`,
+        `제한 ${s.timeLimit}s`,
+        `광역 ${s.aoe}s`,
+        `보스 ${s.bossSpawn}킬/HP${s.bossHp}`,
+        inputNames[s.inputMode] || s.inputMode,
+    ].join(' · ');
+}
+
+function showRankingView() {
+    const s = {
+        opType:        document.getElementById('opTypeSelect').value,
+        subType:       document.getElementById('subTypeSelect').value,
+        speed:         document.getElementById('speedSlider').value,
+        spawnInterval: document.getElementById('spawnIntervalInput').value,
+        gameTime:      document.getElementById('gameTimeInput').value,
+        timeLimit:     document.getElementById('timeLimitInput').value,
+        aoe:           document.getElementById('aoeInput').value,
+        bossSpawn:     document.getElementById('bossSpawnInput').value,
+        bossHp:        document.getElementById('bossHpInput').value,
+        inputMode:     document.querySelector('input[name="inputMode"]:checked').value,
+    };
+    const key = getRankKey(s);
+    document.getElementById('rankingViewKeyLabel').textContent = getRankKeyLabel(s);
+    document.getElementById('rankingViewBody').innerHTML = renderRankingTable(key, -1);
+    document.getElementById('rankingViewModal').style.display = 'flex';
+    document.getElementById('rankingViewModal').dataset.currentKey = key;
+}
+
+function resetCurrentRanking() {
+    const key = document.getElementById('rankingViewModal').dataset.currentKey;
+    if (!key) return;
+    if (!confirm('이 설정의 랭킹을 모두 삭제하시겠습니까?')) return;
+    let all;
+    try { all = JSON.parse(localStorage.getItem(RANKING_KEY)) || {}; }
+    catch(e) { all = {}; }
+    delete all[key];
+    localStorage.setItem(RANKING_KEY, JSON.stringify(all));
+    document.getElementById('rankingViewBody').innerHTML = '<div id="rankNoEntry">기록 없음</div>';
+}
 
 const DEFAULTS = {
     mathLayout:    'horizontal',
@@ -988,6 +1125,7 @@ const DEFAULTS = {
     bossSpawn:     '10',
     bossHp:        '5',
     inputMode:     'type',
+    nickname:      '',
     voiceEnabled:  false,
     voiceMode:     'auto',
     voiceTrigger:  '정답',
@@ -1020,6 +1158,7 @@ function saveSettings() {
         bossSpawn:     document.getElementById('bossSpawnInput').value,
         bossHp:        document.getElementById('bossHpInput').value,
         inputMode:     document.querySelector('input[name="inputMode"]:checked').value,
+        nickname:      document.getElementById('nicknameInput').value.trim(),
         voiceEnabled:  document.getElementById('voiceEnabledCheck').checked,
         voiceMode:     document.querySelector('input[name="voiceMode"]:checked').value,
         voiceTrigger:  document.getElementById('voiceTriggerInput').value.trim() || '정답',
@@ -1036,6 +1175,7 @@ function loadSettings() {
     // 라디오 / 체크박스
     document.querySelector(`input[name="mathLayout"][value="${v('mathLayout')}"]`).checked = true;
     document.querySelector(`input[name="inputMode"][value="${v('inputMode')}"]`).checked = true;
+    document.getElementById('nicknameInput').value = v('nickname');
     const voiceEn = v('voiceEnabled');
     document.getElementById('voiceEnabledCheck').checked = voiceEn;
     document.getElementById('voiceOptions').style.display = voiceEn ? '' : 'none';
@@ -1109,10 +1249,19 @@ function startGame() {
         aoe: document.getElementById("aoeInput").value,
         bossSpawn: document.getElementById("bossSpawnInput").value,
         bossHp: document.getElementById("bossHpInput").value,
+        // 랭킹 키 생성용
+        opType:    document.getElementById('opTypeSelect').value,
+        subType:   document.getElementById('subTypeSelect').value,
+        speed:     document.getElementById('speedSlider').value,
+        gameTime:  document.getElementById('gameTimeInput').value,
+        inputMode,
+        nickname:  document.getElementById('nicknameInput').value.trim() || '익명',
     };
 
     document.getElementById("startScreen").style.display = "none";
     document.getElementById("gameOverlay").style.display = "flex";
+    gameEnded = false;
+    rankingSaved = false;
     gameRunning = true;
 
     mainClock = setInterval(() => {
@@ -1383,7 +1532,9 @@ document.getElementById("answerInput").addEventListener("keydown", e => {
 });
 
 // UX #9: alert 대신 게임 오버 모달 표시
-function endGame(msg) {
+function endGame(msg, skipRanking = false) {
+    if (gameEnded) return; // 중복 호출 방지
+    gameEnded = true;
     stopSpeechRecognition();
     // Bug #4: gameRunning 플래그 해제로 spawnLoop 정지
     gameRunning = false;
@@ -1397,6 +1548,26 @@ function endGame(msg) {
     document.getElementById("gameOverScore").innerText = `SCORE: ${score}`;
     document.getElementById("gameOverStats").innerText = `총 처치: ${totalKillCount}마리  |  남은 HP: ${Math.max(0, playerHp)}%`;
 
+    // 랭킹 저장 및 표시 (세션당 1회만 저장 — 계속 진행 후 중복 방지, 수동 중단 시 제외)
+    if (savedSettings && !skipRanking) {
+        const rankKey = getRankKey(savedSettings);
+        const badge = document.getElementById('myRankBadge');
+        if (!rankingSaved) {
+            rankingSaved = true;
+            const myIdx = saveRanking(rankKey, score, totalKillCount, savedSettings.nickname);
+            if (myIdx === -1) {
+                badge.innerText = '10위권 밖';
+            } else {
+                const rankNum = myIdx + 1;
+                badge.innerText = rankNum <= 3 ? `🎉 ${rankNum}위 진입!` : `${rankNum}위 기록!`;
+                badge.style.color = rankNum === 1 ? '#ffd700' : rankNum === 2 ? '#c0c0c0' : rankNum === 3 ? '#cd7f32' : '#aaa';
+            }
+        } else {
+            badge.innerText = '';
+        }
+        document.getElementById('rankingSection').innerHTML = renderRankingTable(rankKey, -1);
+    }
+
     document.getElementById("gameOverModal").style.display = "flex";
 }
 
@@ -1404,6 +1575,7 @@ function endGame(msg) {
 function continueGame() {
     document.getElementById("gameOverModal").style.display = "none";
     document.getElementById("gameOverlay").style.display = "flex";
+    gameEnded = false;
     gameRunning = true;
     mainClock = setInterval(() => {
         gameRemainTime--;
@@ -1433,6 +1605,8 @@ function restartGame() {
     document.getElementById("gameClock").innerText = `TIME: ${gameRemainTime}s`;
     document.getElementById("gameOverlay").style.display = "flex";
 
+    gameEnded = false;
+    rankingSaved = false;
     gameRunning = true;
     mainClock = setInterval(() => {
         gameRemainTime--;
