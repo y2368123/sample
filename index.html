@@ -61,6 +61,7 @@ input[type="number"] { padding: 6px; border-radius: 5px; background: #222; color
  padding: clamp(8px, 2vw, 20px);
  display: flex; justify-content: space-between; align-items: flex-start;
  pointer-events: none;
+ z-index: 6;
 }
 #hpContainer {
  position: relative;
@@ -76,6 +77,28 @@ input[type="number"] { padding: 6px; border-radius: 5px; background: #222; color
 }
 #scoreText { color: #ffd700; font-size: clamp(16px, 4vw, 28px); font-weight: bold; }
 #gameClock { color: white; font-size: clamp(12px, 3vw, 18px); }
+#inGameBtns {
+    margin-top: 7px;
+    pointer-events: auto;
+}
+.ingame-btn {
+    font-size: clamp(11px, 2vw, 13px);
+    padding: 5px 14px;
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 20px;
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.65);
+    cursor: pointer;
+    width: auto; margin-top: 0;
+    backdrop-filter: blur(4px);
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    letter-spacing: 0.3px;
+}
+.ingame-btn:hover {
+    background: rgba(255,255,255,0.2);
+    border-color: rgba(255,255,255,0.5);
+    color: white;
+}
 
 /* ── 배틀 UI ── */
 #battleUI {
@@ -209,6 +232,9 @@ input[type="number"] { padding: 6px; border-radius: 5px; background: #222; color
 <div id="gameOverlay" style="display:none">
     <div id="hpArea">
         <div id="hpContainer"><div id="hpBar"></div><div id="hpPercentText">100%</div></div>
+        <div id="inGameBtns">
+            <button class="ingame-btn" onclick="endGame('메인메뉴')">🏠 메인</button>
+        </div>
     </div>
     <div id="scoreArea" style="text-align: right;">
         <div id="scoreText">SCORE: 0</div>
@@ -329,6 +355,7 @@ input[type="number"] { padding: 6px; border-radius: 5px; background: #222; color
         <div id="gameOverTitle">게임 종료</div>
         <div id="gameOverScore">SCORE: 0</div>
         <div id="gameOverStats"></div>
+        <button class="modal-btn" id="continueBtn" onclick="continueGame()" style="background:#1a6aaa;">계속 진행하기</button>
         <button class="modal-btn" id="restartBtn" onclick="restartGame()">다시 시작 (같은 설정)</button>
         <button class="modal-btn" id="mainMenuBtn" onclick="location.reload()">처음 화면으로</button>
     </div>
@@ -620,12 +647,15 @@ function generateDistractors(correct, a, b, op) {
         }
     }
 
-    // 중복 제거, 정답 제외, 음수 제외
+    // 중복 제거, 정답 제외, 음수 제외, 자릿수 초과 제외
+    const correctNum = isRem ? null : parseInt(correct);
+    const maxAllowed = (!isRem && correctNum < 10) ? 9 : 999;
     const seen = new Set([correct]);
     const valid = [];
     for (const v of pool) {
         const s = String(v);
-        if (!seen.has(s) && !s.startsWith('-')) { seen.add(s); valid.push(s); }
+        const n = parseInt(s);
+        if (!seen.has(s) && !s.startsWith('-') && (isRem || n <= maxAllowed)) { seen.add(s); valid.push(s); }
     }
 
     // 셔플
@@ -640,7 +670,7 @@ function generateDistractors(correct, a, b, op) {
     while (result.length < 4 && offset < 100) {
         const base = isRem ? parseInt(correct.split('...')[0]) : parseInt(correct);
         const cand = String(base + offset);
-        if (!seen.has(cand)) { result.push(cand); seen.add(cand); }
+        if (!seen.has(cand) && (isRem || parseInt(cand) <= maxAllowed)) { result.push(cand); seen.add(cand); }
         offset++;
     }
     return result;
@@ -1370,9 +1400,23 @@ function endGame(msg) {
     document.getElementById("gameOverModal").style.display = "flex";
 }
 
+// 게임 중단 없이 계속 진행
+function continueGame() {
+    document.getElementById("gameOverModal").style.display = "none";
+    document.getElementById("gameOverlay").style.display = "flex";
+    gameRunning = true;
+    mainClock = setInterval(() => {
+        gameRemainTime--;
+        document.getElementById("gameClock").innerText = `TIME: ${gameRemainTime}s`;
+        if (gameRemainTime <= 0) endGame("시간 종료!");
+    }, 1000);
+    spawnLoop();
+}
+
 // 같은 설정으로 재시작
 function restartGame() {
     // 상태 초기화
+    clearInterval(battleTimer);
     monsters = []; effects = []; flashes = [];
     slime = { x: canvas.width/2, y: canvas.height/2 };
     battleMode = false; currentMonster = null;
@@ -1399,7 +1443,7 @@ function restartGame() {
 }
 
 function update() {
-    if (!battleMode && gameRemainTime > 0) {
+    if (gameRunning && !battleMode && gameRemainTime > 0) {
         monsters.forEach(m => {
             if (m.dead) return;
             let dx = slime.x - m.x, dy = slime.y - m.y, d = Math.sqrt(dx*dx + dy*dy);
