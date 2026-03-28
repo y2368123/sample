@@ -1509,6 +1509,10 @@ function updateHpBar() {
 
 function spawnBoss() {
     bossActive = true;
+    // 잔여 일반 몬스터 즉시 제거 — finishBattle의 battleMode=false(300ms) 이후
+    // 일반 몬스터가 startBattle을 가로채 보스 배틀이 시작 안 되는 데드락 방지
+    monsters.forEach(m => { if (!m.dead && !m.boss) { spawnExplosion(m.x, m.y, 30); m.dead = true; score += 10; } });
+    updateScore();
     let bHp = parseInt(document.getElementById("bossHpInput").value);
     let bossObj = { x: canvas.width/2, y: 150, speed: 0, img: monsterImgs[2], boss: true, hp: bHp, maxHp: bHp, dead: false };
     monsters.push(bossObj);
@@ -1618,13 +1622,19 @@ function restartGame() {
 
 function update() {
     if (gameRunning && !battleMode && gameRemainTime > 0) {
-        monsters.forEach(m => {
-            if (m.dead) return;
-            let dx = slime.x - m.x, dy = slime.y - m.y, d = Math.sqrt(dx*dx + dy*dy);
-            if (!m.boss) { m.x += dx/d*m.speed; m.y += dy/d*m.speed; }
-            // Bug #2: forEach 내부에서도 battleMode 재확인으로 같은 프레임 다중 배틀 차단
-            if (d < 80 && !battleMode) startBattle(m);
-        });
+        // 안전망: bossActive인데 배틀이 안 시작된 경우 강제 시작
+        if (bossActive) {
+            const boss = monsters.find(m => m.boss && !m.dead);
+            if (boss) startBattle(boss);
+        } else {
+            monsters.forEach(m => {
+                if (m.dead) return;
+                let dx = slime.x - m.x, dy = slime.y - m.y, d = Math.sqrt(dx*dx + dy*dy);
+                m.x += dx/d*m.speed; m.y += dy/d*m.speed;
+                // Bug #2: forEach 내부에서도 battleMode 재확인으로 같은 프레임 다중 배틀 차단
+                if (d < 80 && !battleMode) startBattle(m);
+            });
+        }
     }
     effects.forEach(e => { e.x += e.vx; e.y += e.vy; e.vy += 0.35; e.life -= 0.02; });
     effects = effects.filter(e => e.life > 0);
