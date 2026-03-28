@@ -2156,9 +2156,9 @@ const _origSelectDiff = selectDiff;
 selectDiff = function(d) { _origSelectDiff(d); saveSettings(); };
 const _origSelectRounds = selectRounds;
 selectRounds = function(r) { _origSelectRounds(r); saveSettings(); };
-document.getElementById('speed-input').addEventListener('change', () => {
-  cfg.mySpeed = parseInt(document.getElementById('speed-input').value) || 200;
-  saveSettings();
+document.getElementById('speed-input').addEventListener('input', () => {
+  const v = parseInt(document.getElementById('speed-input').value);
+  if (v && v > 0) { cfg.mySpeed = v; saveSettings(); }
 });
 
 // ─── 초기화 ───
