@@ -1,0 +1,1667 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>슬라임 수학대전</title>
+
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; overflow: hidden; background: black; font-family: Arial; }
+canvas { display: block; }
+
+@keyframes screenShake {
+ 0% { transform: translate(0, 0); }
+ 10% { transform: translate(-10px, -10px); }
+ 20% { transform: translate(10px, 5px); }
+ 30% { transform: translate(-5px, 10px); }
+ 40% { transform: translate(5px, -5px); }
+ 50% { transform: translate(-10px, 5px); }
+ 100% { transform: translate(0, 0); }
+}
+.shake-effect { animation: screenShake 0.5s; }
+
+@keyframes bossHit {
+ 0% { filter: brightness(1) sepia(0); transform: scale(1); }
+ 50% { filter: brightness(2) sepia(1) hue-rotate(-50deg); transform: scale(1.1); }
+ 100% { filter: brightness(1) sepia(0); transform: scale(1); }
+}
+.boss-hit-anim { animation: bossHit 0.4s; }
+
+/* ── 시작 화면 ── */
+.centerUI {
+ position: absolute; top: 50%; left: 50%;
+ transform: translate(-50%, -50%);
+ text-align: center; color: white;
+ background: rgba(0,0,0,0.88); padding: clamp(16px, 4vw, 30px);
+ border-radius: 20px;
+ width: min(500px, 96vw);
+ max-height: 94vh; overflow-y: auto;
+ z-index: 10;
+}
+.centerUI h1 { font-size: clamp(20px, 5vw, 28px); }
+
+button {
+ padding: clamp(9px, 2vw, 12px) 25px;
+ font-size: clamp(15px, 3.5vw, 18px);
+ border: none; border-radius: 10px;
+ background: #28a745; color: white;
+ cursor: pointer; margin-top: 15px; width: 100%;
+}
+
+.option-row { margin-bottom: 10px; text-align: left; }
+.option-row > label:first-child { display: inline-block; width: 130px; font-size: clamp(12px, 3vw, 14px); }
+select, input[type="number"], input[type="range"] { font-size: clamp(12px, 3vw, 14px); }
+select { width: 100%; margin-top: 4px; padding: 6px; border-radius: 5px; background: #222; color: white; border: 1px solid #555; }
+input[type="number"] { padding: 6px; border-radius: 5px; background: #222; color: white; border: 1px solid #555; width: 60px; }
+
+/* ── 인게임 오버레이 (HP / 점수) ── */
+#gameOverlay {
+ position: absolute; top: 0; left: 0; width: 100%;
+ padding: clamp(8px, 2vw, 20px);
+ display: flex; justify-content: space-between; align-items: flex-start;
+ pointer-events: none;
+ z-index: 6;
+}
+#hpContainer {
+ position: relative;
+ width: clamp(120px, 28vw, 250px); height: clamp(18px, 3vw, 25px);
+ background: rgba(255,0,0,0.3); border: 2px solid #fff;
+ border-radius: 15px; overflow: hidden;
+}
+#hpBar { width: 100%; height: 100%; background: linear-gradient(to right, #28a745, #5cb85c); transition: width 0.3s; }
+#hpPercentText {
+ position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+ display: flex; align-items: center; justify-content: center;
+ color: white; font-weight: bold; font-size: clamp(10px, 2vw, 14px); text-shadow: 1px 1px 2px black;
+}
+#scoreText { color: #ffd700; font-size: clamp(16px, 4vw, 28px); font-weight: bold; }
+#gameClock { color: white; font-size: clamp(12px, 3vw, 18px); }
+#inGameBtns {
+    margin-top: 7px;
+    pointer-events: auto;
+}
+.ingame-btn {
+    font-size: clamp(11px, 2vw, 13px);
+    padding: 5px 14px;
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 20px;
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.65);
+    cursor: pointer;
+    width: auto; margin-top: 0;
+    backdrop-filter: blur(4px);
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    letter-spacing: 0.3px;
+}
+.ingame-btn:hover {
+    background: rgba(255,255,255,0.2);
+    border-color: rgba(255,255,255,0.5);
+    color: white;
+}
+
+/* ── 배틀 UI ── */
+#battleUI {
+ position: absolute; top: 50%; left: 50%;
+ transform: translate(-50%, -50%);
+ background: rgba(0,0,0,0.75);
+ padding: clamp(16px, 4vw, 40px);
+ border-radius: 25px; text-align: center; color: white;
+ width: min(740px, 96vw);
+ display: none; border: 2px solid #666; z-index: 5;
+}
+#bossImage { width: clamp(80px, 18vw, 150px); height: clamp(80px, 18vw, 150px); object-fit: contain; }
+#bossHpBarContainer {
+ width: min(500px, 90%); height: 18px;
+ background: #333; margin: 12px auto;
+ border: 1px solid #fff; border-radius: 9px; overflow: hidden;
+}
+#bossHpBar { height: 100%; background: red; width: 100%; transition: width 0.3s; }
+#problem {
+ font-size: clamp(28px, 9vw, 70px);
+ color: yellow; margin-bottom: 8px;
+ white-space: pre; line-height: 1.1;
+ font-family: 'Courier New', Courier, monospace;
+}
+#hint { font-size: clamp(13px, 3vw, 18px); color: #aaa; margin-bottom: 5px; min-height: 20px; }
+#wrongFeedback { font-size: clamp(15px, 3.5vw, 22px); font-weight: bold; color: #ff4444; min-height: 26px; margin-bottom: 6px; }
+#micStatus {
+    font-size: clamp(11px, 2.5vw, 13px); min-height: 18px; margin-bottom: 4px; color: #555;
+}
+#micStatus.active { color: #ff8888; animation: micPulse 1.4s ease-in-out infinite; }
+#micTranscript {
+    font-size: clamp(12px, 2.8vw, 15px); min-height: 20px; margin-bottom: 6px;
+    color: #aaa; font-style: italic;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+@keyframes micPulse { 0%,100%{opacity:1} 50%{opacity:0.45} }
+#micTalkBtn {
+    background: #1a3a6a; border: 2px solid #3a6aaa; color: white;
+    width: auto; padding: clamp(8px,2vw,11px) clamp(20px,5vw,36px);
+    font-size: clamp(14px,3.5vw,17px); border-radius: 30px;
+    cursor: pointer; margin-top: 10px; transition: all 0.15s;
+}
+#micTalkBtn:hover { background: #1e4a8a; border-color: #5599dd; }
+#micTalkBtn.active {
+    background: rgba(180,20,20,0.35); border-color: #ff4444;
+    animation: micPulse 1.4s ease-in-out infinite;
+}
+#answerInput {
+ font-size: clamp(26px, 7vw, 45px);
+ width: min(350px, 82vw);
+ text-align: center; border-radius: 10px; border: none; outline: none;
+ padding: 4px 8px;
+}
+#timerBarContainer { width: 100%; height: clamp(8px, 2vw, 15px); background: #400; margin-top: 16px; border-radius: 10px; overflow: hidden; }
+#timerBar { height: 100%; background: red; width: 100%; transition: width 0.05s linear; }
+
+/* ── 보기 선택 모드 ── */
+#choicesContainer {
+    display: none;
+    grid-template-columns: repeat(6, 1fr);
+    gap: clamp(6px, 1.5vw, 10px);
+    margin-top: 10px;
+    width: min(480px, 100%);
+    margin-left: auto; margin-right: auto;
+}
+#choicesContainer.active { display: grid; }
+.choice-btn {
+    grid-column: span 2;
+    padding: clamp(8px, 2.5vw, 14px) 4px;
+    font-size: clamp(18px, 5vw, 30px);
+    font-weight: bold;
+    border: 2px solid #555; border-radius: 10px;
+    background: #1a1a3a; color: white;
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s, transform 0.08s;
+    user-select: none; -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+.choice-btn:hover  { background: #25254a; border-color: #999; }
+.choice-btn:active { transform: scale(0.94); }
+.choice-btn.correct { background: #0a3a0a; border-color: #0f0; color: #0f0; pointer-events: none; }
+.choice-btn.wrong   { background: #3a0a0a; border-color: #f44; color: #f44; pointer-events: none; }
+/* 4~5번째: 각 3칸 → 두 번째 줄에 2개 균등 배치 */
+.choice-btn:nth-child(4),
+.choice-btn:nth-child(5) { grid-column: span 3; }
+
+/* ── 게임 오버 모달 ── */
+#gameOverModal {
+ display: none;
+ position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+ background: rgba(0,0,0,0.88); z-index: 20;
+ justify-content: center; align-items: center;
+ padding: 16px;
+}
+#gameOverBox {
+ background: #1a1a2e; border: 2px solid #e94560;
+ border-radius: 20px; padding: clamp(24px, 6vw, 50px) clamp(20px, 7vw, 60px);
+ text-align: center; color: white;
+ width: min(480px, 96vw);
+ max-height: 90vh; overflow-y: auto;
+}
+#rankingSection { margin-top: 16px; text-align: left; }
+#rankingSection h3 { color: #ffd700; font-size: 14px; text-align: center; margin: 0 0 8px; letter-spacing: 1px; }
+#rankingTable { width: 100%; border-collapse: collapse; font-size: 12px; }
+#rankingTable th { color: #777; padding: 4px 5px; border-bottom: 1px solid #333; font-weight: normal; }
+#rankingTable td { padding: 5px 5px; border-bottom: 1px solid #1e1e30; }
+#rankingTable tr.my-rank td { background: rgba(255,215,0,0.07); font-weight: bold; }
+#rankingTable tr.my-rank td:first-child { color: #ff6b6b; }
+#rankingTable tr.my-rank td:nth-child(3) { color: #ffd700; }
+#rankNoEntry { color: #444; text-align: center; font-size: 13px; padding: 10px 0; }
+#gameOverTitle { font-size: clamp(28px, 8vw, 46px); font-weight: bold; margin-bottom: 8px; }
+#gameOverScore { font-size: clamp(24px, 7vw, 38px); color: #ffd700; margin: 14px 0 8px; }
+#gameOverStats { font-size: clamp(13px, 3vw, 18px); color: #aaa; margin-bottom: 24px; }
+.modal-btn {
+ display: block; width: 100%; padding: clamp(10px, 2.5vw, 14px);
+ font-size: clamp(15px, 4vw, 20px);
+ border: none; border-radius: 12px; cursor: pointer;
+ margin-top: 10px; font-weight: bold;
+}
+#restartBtn { background: #28a745; color: white; }
+#mainMenuBtn { background: #555; color: white; }
+#resetSettingsBtn {
+ background: transparent; border: 1px solid #444; color: #777;
+ font-size: clamp(12px, 2.5vw, 13px); padding: 6px 14px;
+ border-radius: 8px; cursor: pointer; margin-top: 8px; width: auto;
+}
+#resetSettingsBtn:hover { border-color: #e94560; color: #e94560; }
+
+/* ── 모바일: 480px 이하 ── */
+@media (max-width: 480px) {
+ .option-row > label:first-child { width: 110px; }
+ #battleUI { border-radius: 16px; }
+ #gameOverBox { border-radius: 14px; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<div id="gameOverlay" style="display:none">
+    <div id="hpArea">
+        <div id="hpContainer"><div id="hpBar"></div><div id="hpPercentText">100%</div></div>
+        <div id="inGameBtns">
+            <button class="ingame-btn" onclick="endGame('메인메뉴', true)">🏠 메인</button>
+        </div>
+    </div>
+    <div id="scoreArea" style="text-align: right;">
+        <div id="scoreText">SCORE: 0</div>
+        <div id="gameClock">TIME: 60s</div>
+    </div>
+</div>
+
+<div id="startScreen" class="centerUI">
+    <h1 style="color:#44ff44; margin-top:0;">슬라임 수학대전</h1>
+
+    <div class="option-row">
+        <label>닉네임:</label>
+        <input type="text" id="nicknameInput" maxlength="12" placeholder="익명" style="width:120px; text-align:left;">
+    </div>
+
+    <div class="option-row">
+        <label>문제 형식:</label>
+        <input type="radio" name="mathLayout" value="horizontal" id="layoutH" checked> <label for="layoutH" style="width:auto; cursor:pointer;">가로셈</label>
+        <input type="radio" name="mathLayout" value="vertical" id="layoutV" style="margin-left:20px;"> <label for="layoutV" style="width:auto; cursor:pointer;">세로셈</label>
+    </div>
+
+    <div class="option-row">
+        <label>연산 종류:</label>
+        <select id="opTypeSelect" onchange="updateSubOptions()">
+            <option value="add">덧셈 (+)</option>
+            <option value="sub">뺄셈 (-)</option>
+            <option value="mul">곱셈 (×)</option>
+            <option value="div">나눗셈 (÷)</option>
+        </select>
+    </div>
+    <div class="option-row">
+        <label>세부 난이도:</label>
+        <select id="subTypeSelect"></select>
+    </div>
+
+    <hr style="border: 0.5px solid #444; margin: 15px 0;">
+
+    <div class="option-row">
+        <label>몬스터 속도:</label>
+        <input type="range" id="speedSlider" min="1" max="10" step="0.5" value="4" oninput="speedValDisp.innerText=this.value">
+        <span id="speedValDisp" style="color:yellow; font-weight:bold;">4</span>
+    </div>
+
+    <div class="option-row">
+        <label>생성 간격(초):</label>
+        <input type="number" id="spawnIntervalInput" value="0.5" step="0.1" style="width:60px">
+    </div>
+
+    <div class="option-row">
+        <label>게임 시간(분):</label>
+        <input type="number" id="gameTimeInput" value="1" step="0.5" style="width:60px">
+    </div>
+
+    <div class="option-row">
+        <label>문제 제한 시간(초):</label>
+        <input type="number" id="timeLimitInput" value="20" style="width:60px">
+    </div>
+
+    <div class="option-row">
+        <label>광역 조건(초):</label>
+        <input type="number" id="aoeInput" value="10" style="width:60px">
+    </div>
+
+    <div class="option-row">
+        <label>보스 등장(킬수):</label>
+        <input type="number" id="bossSpawnInput" value="10" style="width:60px">
+        <label style="width:80px; margin-left:10px;">보스 체력:</label>
+        <input type="number" id="bossHpInput" value="5" style="width:40px">
+    </div>
+
+    <div class="option-row">
+        <label>입력 방식:</label>
+        <input type="radio" name="inputMode" value="type" id="inputType" checked>
+        <label for="inputType" style="width:auto; cursor:pointer;">직접 입력</label>
+        <input type="radio" name="inputMode" value="choices" id="inputChoices" style="margin-left:16px;">
+        <label for="inputChoices" style="width:auto; cursor:pointer;">📱 보기 선택</label>
+    </div>
+
+    <div class="option-row">
+        <label>음성인식:</label>
+        <input type="checkbox" id="voiceEnabledCheck" onchange="toggleVoiceOptions(this.checked)" style="width:auto; cursor:pointer;">
+        <label for="voiceEnabledCheck" style="width:auto; cursor:pointer; margin-left:4px;">사용</label>
+    </div>
+    <div id="voiceOptions" style="display:none;">
+        <div class="option-row" style="padding-left:12px;">
+            <label>인식 방식:</label>
+            <input type="radio" name="voiceMode" value="auto" id="voiceAuto" checked>
+            <label for="voiceAuto" style="width:auto; cursor:pointer;">자동</label>
+            <input type="radio" name="voiceMode" value="ptt" id="voicePtt" style="margin-left:16px;">
+            <label for="voicePtt" style="width:auto; cursor:pointer;">PTT (버튼/스페이스)</label>
+        </div>
+        <div class="option-row" style="padding-left:12px;">
+            <label>트리거 단어:</label>
+            <input type="text" id="voiceTriggerInput" value="정답" maxlength="10"
+                   style="width:80px; text-align:center;" placeholder="정답">
+            <span style="color:#888; font-size:12px; margin-left:8px;">예) "<span id="triggerPreview">정답</span> 32"</span>
+        </div>
+    </div>
+
+    <button onclick="startGame()">전투 시작</button>
+    <button onclick="showRankingView()" style="background:#7b4f00; color:#ffd700;">🏆 랭킹 보기</button>
+    <button id="resetSettingsBtn" onclick="resetSettings()">↺ 설정 초기화</button>
+</div>
+
+<div id="battleUI">
+    <div id="micTranscript"></div>
+    <div id="bossSection" style="display:none">
+        <img id="bossImage" src="">
+        <div id="bossHpBarContainer"><div id="bossHpBar"></div></div>
+    </div>
+    <div id="micStatus"></div>
+    <div id="wrongFeedback"></div>
+    <div id="problem"></div>
+    <div id="hint"></div>
+    <input id="answerInput" type="text" autocomplete="off" placeholder="정답 입력">
+    <div id="choicesContainer"></div>
+    <button id="micTalkBtn" type="button" onclick="pttActivate()" style="display:none;">🎤 말하기 (Space)</button>
+    <div id="timerBarContainer"><div id="timerBar"></div></div>
+</div>
+
+<!-- 랭킹 뷰 모달 -->
+<div id="rankingViewModal" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.92); z-index:30; justify-content:center; align-items:center; padding:16px;">
+    <div style="background:#1a1a2e; border:2px solid #ffd700; border-radius:20px; padding:28px 24px; width:min(500px,96vw); max-height:90vh; overflow-y:auto; color:white; text-align:center;">
+        <div style="font-size:20px; font-weight:bold; color:#ffd700; margin-bottom:6px;">🏆 랭킹</div>
+        <div id="rankingViewKeyLabel" style="font-size:12px; color:#666; margin-bottom:14px; word-break:break-all;"></div>
+        <div id="rankingViewBody"></div>
+        <button class="modal-btn" onclick="resetCurrentRanking()" style="background:#5a1a1a; color:#f88; margin-top:16px;">🗑 이 설정 랭킹 초기화</button>
+        <button class="modal-btn" onclick="document.getElementById('rankingViewModal').style.display='none'" style="background:#444; color:#ccc; margin-top:8px;">닫기</button>
+    </div>
+</div>
+
+<!-- UX #9: 게임 오버 모달 -->
+<div id="gameOverModal">
+    <div id="gameOverBox">
+        <div id="gameOverTitle">게임 종료</div>
+        <div id="gameOverScore">SCORE: 0</div>
+        <div id="gameOverStats"></div>
+        <div id="myRankBadge" style="font-size:14px; color:#aaa; margin-bottom:4px;"></div>
+        <div id="rankingSection"><div id="rankNoEntry">기록 없음</div></div>
+        <button class="modal-btn" id="continueBtn" onclick="continueGame()" style="background:#1a6aaa; margin-top:16px;">계속 진행하기</button>
+        <button class="modal-btn" id="restartBtn" onclick="restartGame()">다시 시작 (같은 설정)</button>
+        <button class="modal-btn" id="mainMenuBtn" onclick="location.reload()">처음 화면으로</button>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+});
+
+const bgImg = new Image(); bgImg.src = "forest.png";
+const slimeImg = new Image(); slimeImg.src = "킹슬라임.png";
+const monsterImgs = ["bat.png","ghost.png","devil.png","mushroom.png","mummy.png"].map(s => { let i = new Image(); i.src = s; return i; });
+
+let monsters = [], effects = [], flashes = [];
+let slime = { x: canvas.width/2, y: canvas.height/2 };
+let battleMode = false, currentMonster = null;
+let correctAnswer = "", battleTimer = null, battleStart = 0;
+let killCount = 0, totalKillCount = 0, bossActive = false, score = 0, playerHp = 100;
+let gameRemainTime = 60, mainClock = null, monsterMoveSpeed = 4;
+// Bug #4: 게임 실행 상태 플래그 - spawnLoop 정지에 사용
+let gameRunning = false;
+let gameEnded = false;    // endGame 중복 호출 방지
+let rankingSaved = false; // 세션당 랭킹 1회 저장 (계속 진행 후 중복 방지)
+// 재시작용 설정 저장
+let savedSettings = null;
+
+// ── 음성 인식 (Web Speech API) ────────────────────────────────────────
+// 브라우저 내장 API 사용. Chrome/Edge 지원. 별도 라이브러리 불필요.
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let voiceRecognition = null;
+let speechActive = false;      // true인 동안 onend에서 자동 재시작
+let speechStopping = false;    // stopSpeechRecognition()이 명시적으로 stop했을 때 true
+let lastInterimTranscript = ''; // PTT 모드에서 final 전 마지막 interim 보존
+let pttFinalProcessed = false;  // PTT 세션에서 final 결과가 처리됐는지 여부
+
+// 음성인식 모드: 'auto' = 배틀 내내 연속 녹음, 'ptt' = 버튼/스페이스 누를 때만
+let voiceModeAuto = true; // startGame()에서 설정값으로 갱신
+
+if (SpeechRecognition) {
+    voiceRecognition = new SpeechRecognition();
+    voiceRecognition.lang = 'ko-KR';
+    voiceRecognition.interimResults = true;
+    voiceRecognition.maxAlternatives = 3;
+
+    // 숫자 단어 문법 힌트 — Chrome에게 인식 후보를 좁혀줌
+    const SpeechGrammarList = window.SpeechGrammarList || window.webkitSpeechGrammarList;
+    if (SpeechGrammarList) {
+        const nums = '영 공 제로 일 하나 한 이 둘 두 삼 셋 세 사 넷 네 오 다섯 육 여섯 칠 일곱 팔 여덟 구 아홉 ' +
+                     '십 열 이십 스물 삼십 서른 사십 마흔 오십 쉰 육십 예순 칠십 일흔 팔십 여든 구십 아흔 백';
+        const grammar = '#JSGF V1.0 UTF-8 ko; grammar numbers; public <number> = ' + nums.split(' ').join(' | ') + ';';
+        const list = new SpeechGrammarList();
+        list.addFromString(grammar, 1);
+        voiceRecognition.grammars = list;
+    }
+
+    voiceRecognition.onstart = () => { speechActive = true; updateMicUI(true); };
+
+    voiceRecognition.onend = () => {
+        speechActive = false;
+        updateMicUI(false);
+
+        // PTT 모드: final 없이 세션이 끝났으면 마지막 interim으로 처리 시도 (한음절 대응)
+        if (!voiceModeAuto && !speechStopping && !pttFinalProcessed && lastInterimTranscript) {
+            const raw = lastInterimTranscript;
+            lastInterimTranscript = '';
+            const transcriptEl = document.getElementById('micTranscript');
+            if (transcriptEl) {
+                transcriptEl.textContent = '🎤 "' + raw + '"';
+                clearTimeout(transcriptEl._clearTimer);
+                transcriptEl._clearTimer = setTimeout(() => { transcriptEl.textContent = ''; }, 3000);
+            }
+            const parsed = parseVoiceInput(raw);
+            if (parsed !== null) {
+                document.getElementById('answerInput').value = parsed;
+                if (parsed === correctAnswer) { endBattle(true); } else { document.getElementById('answerInput').value = ''; endBattle(false); }
+            }
+        }
+        lastInterimTranscript = '';
+        pttFinalProcessed = false;
+
+        // 명시적 stop이면 재시작하지 않음
+        if (speechStopping) { speechStopping = false; return; }
+        // Auto 모드: 배틀이 진행 중이면 자동 재시작 (발화 사이 끊김 방지)
+        if (voiceModeAuto && battleMode) {
+            setTimeout(() => {
+                if (voiceModeAuto && battleMode && !speechActive && !speechStopping) {
+                    try { voiceRecognition.start(); } catch(e) {}
+                }
+            }, 200);
+        }
+        // PTT 모드: 재시작 없음 — 사용자가 버튼/스페이스로 직접 시작
+    };
+
+    voiceRecognition.onerror = (e) => {
+        if (e.error === 'no-speech' || e.error === 'aborted') return;
+        speechActive = false;
+        updateMicUI(false);
+        console.warn('SpeechRecognition error:', e.error);
+    };
+
+    voiceRecognition.onresult = (e) => {
+        const transcriptEl = document.getElementById('micTranscript');
+        const trigger = (currentVoiceTrigger || '정답').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const triggerRe = new RegExp('^' + trigger + '[\\s!.]*(.+)$', 'i');
+
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+            const result = e.results[i];
+            const text = result[0].transcript.trim();
+
+            if (!result.isFinal) {
+                // interim: 패널에 실시간 표시, PTT용으로 저장
+                lastInterimTranscript = text;
+                if (transcriptEl) {
+                    transcriptEl.textContent = '🎤 "' + text + '" ...';
+                    clearTimeout(transcriptEl._clearTimer);
+                }
+                // Auto 모드: interim이라도 트리거+숫자가 확인되면 즉시 처리 (짧은 단어 대응)
+                if (voiceModeAuto) {
+                    const match = text.match(triggerRe);
+                    if (match) {
+                        const parsed = parseVoiceInput(match[1].trim());
+                        if (parsed !== null) {
+                            lastInterimTranscript = '';
+                            pttFinalProcessed = true;
+                            if (transcriptEl) {
+                                transcriptEl.textContent = '🎤 "' + text + '"';
+                                transcriptEl._clearTimer = setTimeout(() => { transcriptEl.textContent = ''; }, 3000);
+                            }
+                            document.getElementById('answerInput').value = parsed;
+                            if (parsed === correctAnswer) { endBattle(true); } else { document.getElementById('answerInput').value = ''; endBattle(false); }
+                        }
+                    }
+                }
+                continue;
+            }
+
+            // final 결과 처리
+            lastInterimTranscript = '';
+            pttFinalProcessed = true;
+            if (transcriptEl) {
+                transcriptEl.textContent = '🎤 "' + text + '"';
+                clearTimeout(transcriptEl._clearTimer);
+                transcriptEl._clearTimer = setTimeout(() => { transcriptEl.textContent = ''; }, 3000);
+            }
+
+            // 후보를 순서대로 시도해 파싱 성공하면 사용
+            let parsed = null;
+            for (let j = 0; j < result.length; j++) {
+                const t = result[j].transcript.trim();
+                let raw;
+                if (voiceModeAuto) {
+                    const match = t.match(triggerRe);
+                    if (!match) continue;
+                    raw = match[1].trim();
+                } else {
+                    raw = t;
+                }
+                parsed = parseVoiceInput(raw);
+                if (parsed !== null) break;
+            }
+            if (parsed === null) continue;
+
+            document.getElementById('answerInput').value = parsed;
+            if (parsed === correctAnswer) {
+                endBattle(true);
+            } else {
+                document.getElementById('answerInput').value = '';
+                endBattle(false);
+            }
+        }
+    };
+}
+
+function startSpeechRecognition() {
+    if (!voiceRecognition || speechActive) return;
+    // continuous = false 고정: Chrome에서 continuous=true는 불안정
+    // 자동 모드는 onend에서 즉시 재시작해 연속 인식을 구현
+    voiceRecognition.continuous = false;
+    try { voiceRecognition.start(); } catch(e) {}
+}
+
+function stopSpeechRecognition() {
+    speechStopping = true;
+    speechActive = false;
+    updateMicUI(false);
+    try { voiceRecognition.stop(); } catch(e) { speechStopping = false; }
+}
+
+// PTT 모드 전용: 스페이스바 또는 버튼으로 1회 인식 시작
+function pttActivate() {
+    if (!battleMode || voiceModeAuto) return;
+    startSpeechRecognition();
+}
+document.addEventListener('keydown', e => {
+    if (e.code === 'Space' && battleMode && !voiceModeAuto
+        && document.activeElement !== document.getElementById('answerInput')) {
+        e.preventDefault();
+        pttActivate();
+    }
+});
+
+function updateMicUI(active) {
+    const el = document.getElementById('micStatus');
+    const btn = document.getElementById('micTalkBtn');
+    if (!el) return;
+    if (!voiceRecognition) {
+        el.className = '';
+        el.innerHTML = '<span style="color:#444;">🎤 음성인식 미지원 (Chrome/Edge 권장)</span>';
+        if (btn) btn.style.display = 'none';
+        return;
+    }
+    if (active) {
+        el.className = 'active';
+        const tw = currentVoiceTrigger || '정답';
+        el.innerHTML = `🎤 듣는 중&nbsp;&nbsp;<span style="font-size:11px;color:#ff9999;">"${tw} 32" 형식으로 말하세요</span>`;
+        if (btn) { btn.classList.add('active'); btn.textContent = '🎤 듣는 중...'; }
+    } else {
+        el.className = '';
+        if (voiceModeAuto) {
+            el.innerHTML = '🎤 <span style="color:#555;">대기 중 (자동)</span>';
+        } else {
+            el.innerHTML = '🎤 <span style="color:#888;">스페이스 또는 아래 버튼으로 말하기</span>';
+        }
+        if (btn) { btn.classList.remove('active'); btn.textContent = '🎤 말하기 (Space)'; }
+    }
+}
+
+// ── 보기 선택 모드: 오답 보기 생성 ──────────────────────────────────
+// 전략: 연산 실수(사칙 혼동), 올림/내림 실수, 자릿수 뒤바꿈, ±소수 변형
+let lastProblemA = 0, lastProblemB = 0, lastProblemOp = '+';
+
+function generateDistractors(correct, a, b, op) {
+    const isRem = correct.includes('...');
+    const pool = [];
+
+    if (isRem) {
+        const [q, r] = correct.split('...').map(Number);
+        // 몫 변형
+        for (const d of [-2, -1, 1, 2]) { if (q + d >= 0) pool.push(`${q+d}...${r}`); }
+        // 나머지 변형 (0 이상, 제수 미만)
+        for (const d of [-1, 1]) { const nr = r + d; if (nr >= 0 && nr < b) pool.push(`${q}...${nr}`); }
+        // 몫↔나머지 뒤바꿈
+        if (r !== q) pool.push(`${r}...${q}`);
+        // 나머지 0 또는 최대값 착각
+        if (r !== 0) pool.push(`${q}...0`);
+        if (r !== b - 1 && b - 1 > 0) pool.push(`${q}...${b-1}`);
+    } else {
+        const c = parseInt(correct);
+
+        // 1. ±소수 변형 (가장 흔한 계산 실수)
+        for (const d of [-3, -2, -1, 1, 2, 3]) { if (c + d >= 0) pool.push(c + d); }
+
+        // 2. 올림·내림 실수 (±10)
+        if (c - 10 >= 0) pool.push(c - 10);
+        if (c + 10 <= 999) pool.push(c + 10);
+
+        // 3. 사칙 혼동
+        if (op === '+') {
+            pool.push(Math.abs(a - b));           // 덧셈→뺄셈
+            if (a * b <= 300) pool.push(a * b);   // 덧셈→곱셈
+        } else if (op === '-') {
+            pool.push(a + b);                     // 뺄셈→덧셈
+            if (b - a >= 0) pool.push(b - a);     // 피감수·감수 뒤집기
+        } else if (op === '×') {
+            pool.push(a + b);                     // 곱셈→덧셈
+            if (c - b >= 0) pool.push(c - b);     // (a-1)×b
+            if (c + b <= 999) pool.push(c + b);   // (a+1)×b
+            if (c - a >= 0) pool.push(c - a);     // a×(b-1)
+            if (c + a <= 999) pool.push(c + a);   // a×(b+1)
+        } else if (op === '÷') {
+            pool.push(a - b >= 0 ? a - b : a + b); // 나눗셈→뺄셈
+            pool.push(c + 1); pool.push(c - 1 >= 0 ? c - 1 : c + 2);
+        }
+
+        // 4. 자릿수 뒤바꿈 (2자리)
+        if (c >= 10 && c <= 99) {
+            const t = Math.floor(c / 10), o = c % 10;
+            if (t !== o) pool.push(o * 10 + t);
+        }
+        // 5. 올림 무시 실수: 일의 자리끼리만 계산한 값
+        if (op === '+') {
+            const onesOnly = (a % 10) + (b % 10);
+            if (onesOnly !== c && onesOnly >= 0) pool.push(onesOnly);
+        }
+    }
+
+    // 중복 제거, 정답 제외, 음수 제외, 자릿수 초과 제외
+    const correctNum = isRem ? null : parseInt(correct);
+    const maxAllowed = (!isRem && correctNum < 10) ? 9 : 999;
+    const seen = new Set([correct]);
+    const valid = [];
+    for (const v of pool) {
+        const s = String(v);
+        const n = parseInt(s);
+        if (!seen.has(s) && !s.startsWith('-') && (isRem || n <= maxAllowed)) { seen.add(s); valid.push(s); }
+    }
+
+    // 셔플
+    for (let i = valid.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [valid[i], valid[j]] = [valid[j], valid[i]];
+    }
+
+    // 4개 확보 (부족하면 ±offset으로 채움)
+    const result = valid.slice(0, 4);
+    let offset = 4;
+    while (result.length < 4 && offset < 100) {
+        const base = isRem ? parseInt(correct.split('...')[0]) : parseInt(correct);
+        const cand = String(base + offset);
+        if (!seen.has(cand) && (isRem || parseInt(cand) <= maxAllowed)) { result.push(cand); seen.add(cand); }
+        offset++;
+    }
+    return result;
+}
+
+function renderChoices(correct, a, b, op) {
+    const container = document.getElementById('choicesContainer');
+    if (!container) return;
+    const distractors = generateDistractors(correct, a, b, op);
+    const all = [correct, ...distractors];
+    // 셔플
+    for (let i = all.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [all[i], all[j]] = [all[j], all[i]];
+    }
+    container.innerHTML = '';
+    for (const val of all) {
+        const btn = document.createElement('button');
+        btn.className = 'choice-btn';
+        btn.textContent = val;
+        btn.onclick = () => handleChoice(btn, val);
+        container.appendChild(btn);
+    }
+    container.classList.add('active');
+}
+
+function handleChoice(btn, val) {
+    if (!battleMode) return;
+    document.getElementById('answerInput').value = val;
+    if (val === correctAnswer) {
+        btn.classList.add('correct');
+        setTimeout(() => endBattle(true), 300);
+    } else {
+        btn.classList.add('wrong');
+        setTimeout(() => {
+            btn.classList.remove('wrong');
+            document.getElementById('answerInput').value = '';
+        }, 500);
+        endBattle(false);
+    }
+}
+
+// ── 한국어 음성 → 게임 입력값 파서 ──────────────────────────────────
+const KO_NUM = {
+    '영':0,'공':0,'제로':0,
+    '일':1,'하나':1,'한':1,
+    '이':2,'둘':2,'두':2,
+    '삼':3,'셋':3,'세':3,
+    '사':4,'넷':4,'네':4,
+    '오':5,'다섯':5,
+    '육':6,'여섯':6,
+    '칠':7,'일곱':7,
+    '팔':8,'여덟':8,
+    '구':9,'아홉':9,
+};
+
+function korToNum(str) {
+    str = str.trim();
+    if (/^\d+$/.test(str)) return parseInt(str, 10); // 아라비아 숫자 그대로
+    let result = 0, rem = str;
+    const bi = rem.indexOf('백');
+    if (bi !== -1) {
+        const pre = rem.slice(0, bi);
+        result += (pre === '' ? 1 : (KO_NUM[pre] ?? 0)) * 100;
+        rem = rem.slice(bi + 1);
+    }
+    const si = rem.indexOf('십');
+    if (si !== -1) {
+        const pre = rem.slice(0, si);
+        result += (pre === '' ? 1 : (KO_NUM[pre] ?? 0)) * 10;
+        rem = rem.slice(si + 1);
+    }
+    if (rem !== '') result += KO_NUM[rem] ?? 0;
+    return result || NaN;
+}
+
+// 나눗셈 나머지 포함 파싱: "칠 나머지 이" → "7...2", "32" → "32"
+function parseVoiceInput(text) {
+    text = text.trim();
+    const m = text.match(/^(.+?)\s*(?:나머지|점)\s*(.+)$/);
+    if (m) {
+        const q = korToNum(m[1].trim()), r = korToNum(m[2].trim());
+        if (!isNaN(q) && !isNaN(r)) return `${q}...${r}`;
+    }
+    const n = korToNum(text);
+    return isNaN(n) ? null : String(n);
+}
+
+// ── 문제 풀(Pool) 시스템 ──────────────────────────────────────────────
+// 각 (연산, 난이도) 조합의 유효한 (a, b) 쌍을 전부 열거해 셔플 후 순차 소비.
+// 풀이 소진되면 자동 재셔플. 이를 통해 특정 패턴 편중 없이 균등 분포 보장.
+const problemPools = {};
+
+function shuffleArray(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
+function buildPool(main, subIdx) {
+    const pairs = [];
+
+    if (main === 'add') {
+        switch (subIdx) {
+            case 0: // 올림 없는 한자리: a+b ≤ 9
+                for (let a = 1; a <= 9; a++)
+                    for (let b = 1; b <= 9 - a; b++)
+                        pairs.push([a, b]);
+                break;
+            case 1: // 올림 있는 한자리: a+b ≥ 10
+                for (let a = 1; a <= 9; a++)
+                    for (let b = Math.max(1, 10 - a); b <= 9; b++)
+                        pairs.push([a, b]);
+                break;
+            case 2: // 올림 있는 2+1: 일의자리 올림
+                for (let a = 11; a <= 99; a++)
+                    for (let b = 1; b <= 9; b++)
+                        if (a % 10 + b >= 10) pairs.push([a, b]);
+                break;
+            case 3: // 올림 없는 2+2: 올림 전혀 없음 (결과 ≤ 99)
+                for (let a = 10; a <= 89; a++)
+                    for (let b = 10; b <= 89; b++)
+                        if (a % 10 + b % 10 < 10 && Math.floor(a / 10) + Math.floor(b / 10) < 10)
+                            pairs.push([a, b]);
+                break;
+            case 4: // 일의자리 올림 2+2: 일의자리만 올림, 십의자리 올림 없음
+                for (let a = 10; a <= 99; a++)
+                    for (let b = 10; b <= 99; b++)
+                        if (a % 10 + b % 10 >= 10 && Math.floor(a / 10) + Math.floor(b / 10) <= 8)
+                            pairs.push([a, b]);
+                break;
+            case 5: // 십의자리 올림 2+2: 일의자리 올림 없음, 십의자리만 올림
+                for (let a = 10; a <= 99; a++)
+                    for (let b = 10; b <= 99; b++)
+                        if (a % 10 + b % 10 < 10 && Math.floor(a / 10) + Math.floor(b / 10) >= 10)
+                            pairs.push([a, b]);
+                break;
+            case 6: // 올림 두번 2+2: 일의자리 올림 + 십의자리 올림 (연쇄)
+                for (let a = 10; a <= 99; a++)
+                    for (let b = 10; b <= 99; b++)
+                        if (a % 10 + b % 10 >= 10 && Math.floor(a / 10) + Math.floor(b / 10) >= 9)
+                            pairs.push([a, b]);
+                break;
+        }
+    }
+    else if (main === 'sub') {
+        switch (subIdx) {
+            case 0: // 한자리 뺄셈 (답이 0인 경우 제외)
+                for (let a = 2; a <= 9; a++)
+                    for (let b = 1; b < a; b++)
+                        pairs.push([a, b]);
+                break;
+            case 1: // 내림 없는 2-1: b ≤ a의 일의자리
+                for (let a = 11; a <= 99; a++)
+                    for (let b = 1; b <= 9; b++)
+                        if (b <= a % 10) pairs.push([a, b]);
+                break;
+            case 2: // 내림 있는 2-1: b > a의 일의자리
+                for (let a = 11; a <= 99; a++)
+                    for (let b = 1; b <= 9; b++)
+                        if (b > a % 10) pairs.push([a, b]);
+                break;
+            case 3: // 내림 없는 2-2: 일의자리 내림 없음
+                for (let a = 20; a <= 99; a++)
+                    for (let b = 10; b < a; b++)
+                        if (a % 10 >= b % 10) pairs.push([a, b]);
+                break;
+            case 4: // 내림 있는 2-2: 일의자리 내림 있음
+                for (let a = 20; a <= 99; a++)
+                    for (let b = 11; b < a; b++)
+                        if (a % 10 < b % 10) pairs.push([a, b]);
+                break;
+            case 5: // 일의자리 내림 3-2: 일의자리 내림 O, 십의자리 내림 X
+                for (let a = 100; a <= 199; a++)
+                    for (let b = 10; b <= 99; b++)
+                        if (a % 10 < b % 10 && Math.floor(a / 10) % 10 >= Math.floor(b / 10))
+                            pairs.push([a, b]);
+                break;
+            case 6: // 십의자리 내림 3-2: 일의자리 내림 X, 십의자리 내림 O
+                for (let a = 100; a <= 199; a++)
+                    for (let b = 10; b <= 99; b++)
+                        if (a % 10 >= b % 10 && Math.floor(a / 10) % 10 < Math.floor(b / 10))
+                            pairs.push([a, b]);
+                break;
+            case 7: // 내림 두번 3-2: 일의자리·십의자리 모두 내림
+                for (let a = 110; a <= 210; a++)
+                    for (let b = 10; b <= 99; b++)
+                        if (a % 10 < b % 10 && Math.floor(a / 10) % 10 < Math.floor(b / 10) && a > b)
+                            pairs.push([a, b]);
+                break;
+        }
+    }
+    else if (main === 'mul') {
+        switch (subIdx) {
+            case 0: // 한자리 곱셈
+                for (let a = 2; a <= 9; a++)
+                    for (let b = 2; b <= 9; b++)
+                        pairs.push([a, b]);
+                break;
+            case 1: // 두자리 × 한자리
+                for (let a = 11; a <= 99; a++)
+                    for (let b = 2; b <= 9; b++)
+                        pairs.push([a, b]);
+                break;
+        }
+    }
+    else { // div
+        switch (subIdx) {
+            case 0: // 구구단 범위, 나머지 없음: b=2-9, q=2-9
+                for (let b = 2; b <= 9; b++)
+                    for (let q = 2; q <= 9; q++)
+                        pairs.push([b * q, b]);
+                break;
+            case 1: // 100이하, 한 자리 나누는 수, 나머지 없음: b=2-9
+                for (let b = 2; b <= 9; b++)
+                    for (let a = 10; a <= 100; a++)
+                        if (a % b === 0 && a !== b) pairs.push([a, b]);
+                break;
+            case 2: // 100이하, 두 자리 나누는 수, 나머지 없음: b=10-20
+                for (let b = 10; b <= 20; b++)
+                    for (let a = b * 2; a <= 100; a += b)
+                        pairs.push([a, b]);
+                break;
+            case 3: // 구구단 범위, 나머지 있음: b=2-9, a ≤ 81
+                for (let b = 2; b <= 9; b++)
+                    for (let a = b + 1; a <= 81; a++)
+                        if (a % b !== 0) pairs.push([a, b]);
+                break;
+            case 4: // 100이하, 한 자리 나누는 수, 나머지 있음: b=2-9
+                for (let b = 2; b <= 9; b++)
+                    for (let a = 10; a <= 100; a++)
+                        if (a % b !== 0) pairs.push([a, b]);
+                break;
+            case 5: // 100이하, 두 자리 나누는 수, 나머지 있음: b=10-20
+                for (let b = 10; b <= 20; b++)
+                    for (let a = b + 1; a <= 100; a++)
+                        if (a % b !== 0) pairs.push([a, b]);
+                break;
+        }
+    }
+
+    return pairs;
+}
+
+function pickFromPool(main, subIdx) {
+    const key = `${main}_${subIdx}`;
+    const pool = problemPools[key];
+    // 풀이 없거나 소진되면 전체 재빌드 후 셔플
+    if (!pool || pool.idx >= pool.data.length) {
+        const data = shuffleArray(buildPool(main, subIdx));
+        problemPools[key] = { data, idx: 0 };
+    }
+    return problemPools[key].data[problemPools[key].idx++];
+}
+
+const subOptions = {
+    add: [
+        "한 자리 + 한 자리 (올림 없음, 합 ≤ 9)",
+        "한 자리 + 한 자리 (올림 있음, 합 ≥ 10)",
+        "두 자리 + 한 자리 (일의 자리 올림)",
+        "두 자리 + 두 자리 (올림 없음)",
+        "두 자리 + 두 자리 (일의 자리만 올림)",
+        "두 자리 + 두 자리 (십의 자리만 올림)",
+        "두 자리 + 두 자리 (일·십의 자리 연속 올림)",
+    ],
+    sub: [
+        "한 자리 − 한 자리",
+        "두 자리 − 한 자리 (내림 없음)",
+        "두 자리 − 한 자리 (내림 있음)",
+        "두 자리 − 두 자리 (내림 없음)",
+        "두 자리 − 두 자리 (일의 자리 내림)",
+        "세 자리 − 두 자리 (일의 자리만 내림)",
+        "세 자리 − 두 자리 (십의 자리만 내림)",
+        "세 자리 − 두 자리 (일·십의 자리 연속 내림)",
+    ],
+    mul: [
+        "한 자리 × 한 자리",
+        "두 자리 × 한 자리",
+    ],
+    div: [
+        "구구단 범위 내 나눗셈 (나머지 없음, 몫 ≤ 9)",
+        "100 이하 나눗셈 — 한 자리 나누는 수 (나머지 없음)",
+        "100 이하 나눗셈 — 두 자리 나누는 수 (나머지 없음)",
+        "구구단 범위 내 나눗셈 (나머지 있음, 피제수 ≤ 81)",
+        "100 이하 나눗셈 — 한 자리 나누는 수 (나머지 있음)",
+        "100 이하 나눗셈 — 두 자리 나누는 수 (나머지 있음)",
+    ],
+};
+
+function updateSubOptions() {
+    const main = document.getElementById('opTypeSelect').value;
+    const sub = document.getElementById('subTypeSelect');
+    sub.innerHTML = "";
+    subOptions[main].forEach((opt, idx) => {
+        let o = document.createElement('option'); o.value = idx; o.innerText = opt;
+        sub.appendChild(o);
+    });
+}
+updateSubOptions();
+
+// ── 설정 저장/불러오기 (localStorage) ────────────────────────────────
+const SETTINGS_KEY = 'mathgame_settings';
+const RANKING_KEY  = 'mathgame_rankings';
+// 랭킹 키에 포함할 설정 항목 (난이도에 영향 주는 것만)
+const RANK_SETTING_KEYS = ['opType','subType','speed','spawnInterval','gameTime','timeLimit','aoe','bossSpawn','bossHp','inputMode'];
+
+function getRankKey(s) {
+    return RANK_SETTING_KEYS.map(k => `${k}:${s[k]}`).join('|');
+}
+
+// 랭킹 저장. 저장 후 내 항목의 인덱스(0-based) 반환. 10위권 밖이면 -1.
+function saveRanking(rankKey, score, kills, nickname) {
+    let all;
+    try { all = JSON.parse(localStorage.getItem(RANKING_KEY)) || {}; }
+    catch(e) { all = {}; }
+    const list = all[rankKey] || [];
+    const _d = new Date(), _p = n => String(n).padStart(2,'0');
+    const dateStr = `${_d.getFullYear().toString().slice(2)}.${_p(_d.getMonth()+1)}.${_p(_d.getDate())} ${_p(_d.getHours())}:${_p(_d.getMinutes())}`;
+    const entry = { score, kills, nickname: (nickname || '익명').trim() || '익명', date: dateStr };
+    list.push(entry);
+    list.sort((a, b) => b.score - a.score);
+    const top10 = list.slice(0, 10);
+    const myIdx = top10.indexOf(entry); // 10위권 밖이면 -1
+    all[rankKey] = top10;
+    localStorage.setItem(RANKING_KEY, JSON.stringify(all));
+    return myIdx;
+}
+
+function getRankings(rankKey) {
+    let all;
+    try { all = JSON.parse(localStorage.getItem(RANKING_KEY)) || {}; }
+    catch(e) { all = {}; }
+    return all[rankKey] || [];
+}
+
+function renderRankingTable(rankKey, myIdx) {
+    const list = getRankings(rankKey);
+    if (!list.length) return '<div id="rankNoEntry">기록 없음</div>';
+    const medals = ['🥇','🥈','🥉'];
+    const rows = list.map((r, i) => {
+        const rank = medals[i] || `${i+1}위`;
+        const cls  = i === myIdx ? ' class="my-rank"' : '';
+        return `<tr${cls}>
+            <td style="text-align:center;width:36px;">${rank}</td>
+            <td>${r.nickname}</td>
+            <td style="text-align:right;color:#ffd700;">${r.score.toLocaleString()}</td>
+            <td style="text-align:right;color:#aaa;">${r.kills}킬</td>
+            <td style="text-align:right;color:#555;font-size:11px;">${r.date}</td>
+        </tr>`;
+    }).join('');
+    return `<h3>🏆 이 설정 TOP 10</h3>
+    <table id="rankingTable">
+        <thead><tr>
+            <th style="text-align:center;">순위</th><th>닉네임</th>
+            <th style="text-align:right;">점수</th><th style="text-align:right;">킬</th>
+            <th style="text-align:right;">날짜/시간</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function getRankKeyLabel(s) {
+    const opNames = { add:'덧셈', sub:'뺄셈', mul:'곱셈', div:'나눗셈' };
+    const inputNames = { type:'직접입력', choices:'보기선택' };
+    return [
+        opNames[s.opType] || s.opType,
+        `난이도 ${parseInt(s.subType)+1}`,
+        `속도 ${s.speed}`,
+        `생성 ${s.spawnInterval}s`,
+        `게임시간 ${s.gameTime}분`,
+        `제한 ${s.timeLimit}s`,
+        `광역 ${s.aoe}s`,
+        `보스 ${s.bossSpawn}킬/HP${s.bossHp}`,
+        inputNames[s.inputMode] || s.inputMode,
+    ].join(' · ');
+}
+
+function showRankingView() {
+    const s = {
+        opType:        document.getElementById('opTypeSelect').value,
+        subType:       document.getElementById('subTypeSelect').value,
+        speed:         document.getElementById('speedSlider').value,
+        spawnInterval: document.getElementById('spawnIntervalInput').value,
+        gameTime:      document.getElementById('gameTimeInput').value,
+        timeLimit:     document.getElementById('timeLimitInput').value,
+        aoe:           document.getElementById('aoeInput').value,
+        bossSpawn:     document.getElementById('bossSpawnInput').value,
+        bossHp:        document.getElementById('bossHpInput').value,
+        inputMode:     document.querySelector('input[name="inputMode"]:checked').value,
+    };
+    const key = getRankKey(s);
+    document.getElementById('rankingViewKeyLabel').textContent = getRankKeyLabel(s);
+    document.getElementById('rankingViewBody').innerHTML = renderRankingTable(key, -1);
+    document.getElementById('rankingViewModal').style.display = 'flex';
+    document.getElementById('rankingViewModal').dataset.currentKey = key;
+}
+
+function resetCurrentRanking() {
+    const key = document.getElementById('rankingViewModal').dataset.currentKey;
+    if (!key) return;
+    if (!confirm('이 설정의 랭킹을 모두 삭제하시겠습니까?')) return;
+    let all;
+    try { all = JSON.parse(localStorage.getItem(RANKING_KEY)) || {}; }
+    catch(e) { all = {}; }
+    delete all[key];
+    localStorage.setItem(RANKING_KEY, JSON.stringify(all));
+    document.getElementById('rankingViewBody').innerHTML = '<div id="rankNoEntry">기록 없음</div>';
+}
+
+const DEFAULTS = {
+    mathLayout:    'horizontal',
+    opType:        'add',
+    subType:       '0',
+    speed:         '4',
+    spawnInterval: '0.5',
+    gameTime:      '1',
+    timeLimit:     '20',
+    aoe:           '10',
+    bossSpawn:     '10',
+    bossHp:        '5',
+    inputMode:     'type',
+    nickname:      '',
+    voiceEnabled:  false,
+    voiceMode:     'auto',
+    voiceTrigger:  '정답',
+};
+
+let currentVoiceTrigger = '정답'; // 배틀 중 사용할 트리거 단어 캐시
+let voiceEnabled = false;         // 음성인식 사용 여부
+let inputMode = 'type';           // 'type' | 'choices'
+
+function toggleVoiceOptions(checked) {
+    document.getElementById('voiceOptions').style.display = checked ? '' : 'none';
+}
+
+// 트리거 단어 입력 시 미리보기 실시간 반영
+document.getElementById('voiceTriggerInput').addEventListener('input', function() {
+    const preview = document.getElementById('triggerPreview');
+    if (preview) preview.textContent = this.value || '정답';
+});
+
+function saveSettings() {
+    const s = {
+        mathLayout:    document.querySelector('input[name="mathLayout"]:checked').value,
+        opType:        document.getElementById('opTypeSelect').value,
+        subType:       document.getElementById('subTypeSelect').value,
+        speed:         document.getElementById('speedSlider').value,
+        spawnInterval: document.getElementById('spawnIntervalInput').value,
+        gameTime:      document.getElementById('gameTimeInput').value,
+        timeLimit:     document.getElementById('timeLimitInput').value,
+        aoe:           document.getElementById('aoeInput').value,
+        bossSpawn:     document.getElementById('bossSpawnInput').value,
+        bossHp:        document.getElementById('bossHpInput').value,
+        inputMode:     document.querySelector('input[name="inputMode"]:checked').value,
+        nickname:      document.getElementById('nicknameInput').value.trim(),
+        voiceEnabled:  document.getElementById('voiceEnabledCheck').checked,
+        voiceMode:     document.querySelector('input[name="voiceMode"]:checked').value,
+        voiceTrigger:  document.getElementById('voiceTriggerInput').value.trim() || '정답',
+    };
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+}
+
+function loadSettings() {
+    let s;
+    try { s = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; }
+    catch(e) { s = {}; }
+    const v = k => s[k] ?? DEFAULTS[k];
+
+    // 라디오 / 체크박스
+    document.querySelector(`input[name="mathLayout"][value="${v('mathLayout')}"]`).checked = true;
+    document.querySelector(`input[name="inputMode"][value="${v('inputMode')}"]`).checked = true;
+    document.getElementById('nicknameInput').value = v('nickname');
+    const voiceEn = v('voiceEnabled');
+    document.getElementById('voiceEnabledCheck').checked = voiceEn;
+    document.getElementById('voiceOptions').style.display = voiceEn ? '' : 'none';
+    document.querySelector(`input[name="voiceMode"][value="${v('voiceMode')}"]`).checked = true;
+
+    // 연산 종류 → 세부 난이도 목록을 먼저 갱신한 뒤 선택
+    const opSel = document.getElementById('opTypeSelect');
+    opSel.value = v('opType');
+    updateSubOptions();
+    document.getElementById('subTypeSelect').value = v('subType');
+
+    // 숫자 입력
+    const slider = document.getElementById('speedSlider');
+    slider.value = v('speed');
+    document.getElementById('speedValDisp').innerText = slider.value;
+
+    document.getElementById('spawnIntervalInput').value = v('spawnInterval');
+    document.getElementById('gameTimeInput').value      = v('gameTime');
+    document.getElementById('timeLimitInput').value     = v('timeLimit');
+    document.getElementById('aoeInput').value           = v('aoe');
+    document.getElementById('bossSpawnInput').value    = v('bossSpawn');
+    document.getElementById('bossHpInput').value       = v('bossHp');
+    const triggerVal = v('voiceTrigger');
+    document.getElementById('voiceTriggerInput').value = triggerVal;
+    const preview = document.getElementById('triggerPreview');
+    if (preview) preview.textContent = triggerVal;
+}
+
+function resetSettings() {
+    localStorage.removeItem(SETTINGS_KEY);
+    // 기본값으로 DOM 복원
+    document.querySelector('input[name="mathLayout"][value="horizontal"]').checked = true;
+    document.querySelector('input[name="inputMode"][value="type"]').checked = true;
+    document.getElementById('voiceEnabledCheck').checked = false;
+    document.getElementById('voiceOptions').style.display = 'none';
+    document.querySelector('input[name="voiceMode"][value="auto"]').checked = true;
+    document.getElementById('opTypeSelect').value = 'add';
+    updateSubOptions();
+    const slider = document.getElementById('speedSlider');
+    slider.value = DEFAULTS.speed;
+    document.getElementById('speedValDisp').innerText = DEFAULTS.speed;
+    document.getElementById('spawnIntervalInput').value = DEFAULTS.spawnInterval;
+    document.getElementById('gameTimeInput').value      = DEFAULTS.gameTime;
+    document.getElementById('timeLimitInput').value     = DEFAULTS.timeLimit;
+    document.getElementById('aoeInput').value           = DEFAULTS.aoe;
+    document.getElementById('bossSpawnInput').value    = DEFAULTS.bossSpawn;
+    document.getElementById('bossHpInput').value       = DEFAULTS.bossHp;
+    document.getElementById('voiceTriggerInput').value = DEFAULTS.voiceTrigger;
+    const preview = document.getElementById('triggerPreview');
+    if (preview) preview.textContent = DEFAULTS.voiceTrigger;
+}
+
+// 페이지 로드 시 저장된 설정 적용
+loadSettings();
+
+function startGame() {
+    monsterMoveSpeed = parseFloat(document.getElementById("speedSlider").value);
+    gameRemainTime = parseFloat(document.getElementById("gameTimeInput").value) * 60;
+
+    inputMode     = document.querySelector('input[name="inputMode"]:checked').value;
+    voiceEnabled  = document.getElementById('voiceEnabledCheck').checked;
+    voiceModeAuto = document.querySelector('input[name="voiceMode"]:checked').value === 'auto';
+    currentVoiceTrigger = document.getElementById('voiceTriggerInput').value.trim() || '정답';
+    saveSettings(); // 전투 시작 시점의 설정을 localStorage에 저장
+
+    savedSettings = {
+        monsterMoveSpeed,
+        gameRemainTime,
+        spawnInterval: document.getElementById("spawnIntervalInput").value,
+        timeLimit: document.getElementById("timeLimitInput").value,
+        aoe: document.getElementById("aoeInput").value,
+        bossSpawn: document.getElementById("bossSpawnInput").value,
+        bossHp: document.getElementById("bossHpInput").value,
+        // 랭킹 키 생성용
+        opType:    document.getElementById('opTypeSelect').value,
+        subType:   document.getElementById('subTypeSelect').value,
+        speed:     document.getElementById('speedSlider').value,
+        gameTime:  document.getElementById('gameTimeInput').value,
+        inputMode,
+        nickname:  document.getElementById('nicknameInput').value.trim() || '익명',
+    };
+
+    document.getElementById("startScreen").style.display = "none";
+    document.getElementById("gameOverlay").style.display = "flex";
+    gameEnded = false;
+    rankingSaved = false;
+    gameRunning = true;
+
+    mainClock = setInterval(() => {
+        gameRemainTime--;
+        document.getElementById("gameClock").innerText = `TIME: ${gameRemainTime}s`;
+        if (gameRemainTime <= 0) endGame("시간 종료!");
+    }, 1000);
+
+    spawnLoop();
+    loop();
+}
+
+// Bug #4: gameRunning 플래그 확인으로 게임 종료 후 루프 정지
+function spawnLoop() {
+    if (!gameRunning) return;
+    if (!bossActive && !battleMode && gameRemainTime > 0) {
+        let side = Math.floor(Math.random() * 4);
+        let x = Math.random() * canvas.width, y = Math.random() * canvas.height;
+        if (side === 0) y = -50;
+        else if (side === 1) x = canvas.width + 50;
+        else if (side === 2) y = canvas.height + 50;
+        else x = -50;
+        monsters.push({ x, y, speed: monsterMoveSpeed, img: monsterImgs[Math.floor(Math.random() * monsterImgs.length)], boss: false, dead: false });
+    }
+    setTimeout(spawnLoop, parseFloat(document.getElementById("spawnIntervalInput").value) * 1000);
+}
+
+function generateProblem() {
+    const main = document.getElementById('opTypeSelect').value;
+    const subIdx = parseInt(document.getElementById('subTypeSelect').value);
+    const layout = document.querySelector('input[name="mathLayout"]:checked').value;
+
+    document.getElementById("hint").innerText = "";
+
+    const [a, b] = pickFromPool(main, subIdx);
+
+    let op;
+    if (main === 'add') {
+        op = '+';
+        correctAnswer = (a + b).toString();
+    } else if (main === 'sub') {
+        op = '-';
+        correctAnswer = (a - b).toString();
+    } else if (main === 'mul') {
+        op = '×';
+        correctAnswer = (a * b).toString();
+    } else {
+        op = '÷';
+        if (subIdx <= 2) {
+            correctAnswer = (a / b).toString();
+        } else {
+            correctAnswer = `${Math.floor(a / b)}...${a % b}`;
+            document.getElementById("hint").innerText = "몫...나머지 입력 (예: 7...2)";
+        }
+    }
+
+    lastProblemA = a; lastProblemB = b; lastProblemOp = op;
+
+    // 보기 선택 모드: 선택지 렌더링
+    if (inputMode === 'choices') renderChoices(correctAnswer, a, b, op);
+
+    if (layout === 'vertical' && main !== 'div') {
+        const maxLen = Math.max(a.toString().length, b.toString().length);
+        const lineA = a.toString().padStart(maxLen + 1, ' ');
+        const lineB = op + b.toString().padStart(maxLen, ' ');
+        const lineC = '-'.repeat(maxLen + 2);
+        document.getElementById("problem").innerText = `${lineA}\n${lineB}\n${lineC}`;
+    } else {
+        document.getElementById("problem").innerText = `${a} ${op} ${b} = ?`;
+    }
+}
+
+function startBattle(m) {
+    // Bug #2: 중복 배틀 진입 방지
+    if (battleMode) return;
+    battleMode = true;
+    currentMonster = m;
+    generateProblem();
+    battleStart = Date.now();
+    document.getElementById("wrongFeedback").innerText = "";
+    document.getElementById("battleUI").style.display = "block";
+
+    // 입력 방식 분기
+    const answerInput = document.getElementById("answerInput");
+    const choicesCont = document.getElementById("choicesContainer");
+    if (inputMode === 'choices') {
+        answerInput.style.display = 'none';
+        // choicesContainer는 generateProblem → renderChoices에서 이미 채워짐
+    } else {
+        answerInput.style.display = '';
+        choicesCont.classList.remove('active');
+        answerInput.value = "";
+        answerInput.focus();
+    }
+    if (m.boss) {
+        document.getElementById("bossSection").style.display = "block";
+        document.getElementById("bossImage").src = m.img.src;
+        updateBossUI();
+    } else {
+        document.getElementById("bossSection").style.display = "none";
+    }
+    startBattleTimer();
+    // 음성인식 ON일 때만 마이크 시작
+    const micStatus = document.getElementById('micStatus');
+    const micTranscript = document.getElementById('micTranscript');
+    const micTalkBtn = document.getElementById('micTalkBtn');
+    if (voiceEnabled) {
+        if (micStatus) micStatus.style.display = '';
+        if (micTranscript) micTranscript.style.display = '';
+        if (voiceModeAuto) {
+            startSpeechRecognition();
+        } else {
+            updateMicUI(false);
+            if (micTalkBtn && voiceRecognition) micTalkBtn.style.display = '';
+        }
+    } else {
+        if (micStatus) micStatus.style.display = 'none';
+        if (micTranscript) micTranscript.style.display = 'none';
+        if (micTalkBtn) micTalkBtn.style.display = 'none';
+    }
+}
+
+function startBattleTimer() {
+    clearInterval(battleTimer);
+    battleTimer = setInterval(() => {
+        let limit = parseFloat(document.getElementById("timeLimitInput").value) * 1000;
+        let remain = limit - (Date.now() - battleStart);
+        document.getElementById("timerBar").style.width = (Math.max(0, remain/limit) * 100) + "%";
+        if (remain <= 0) endBattle(false);
+    }, 50);
+}
+
+function endBattle(success) {
+    clearInterval(battleTimer);
+    if (success) {
+        let timeTaken = Date.now() - battleStart;
+        if (currentMonster.boss) {
+            currentMonster.hp--;
+            document.getElementById("bossImage").classList.add("boss-hit-anim");
+            setTimeout(() => document.getElementById("bossImage").classList.remove("boss-hit-anim"), 400);
+            if (currentMonster.hp <= 0) {
+                score += 100;
+                document.getElementById("battleUI").style.display = "none";
+                setTimeout(bossFinalExplosion, 500);
+            } else {
+                updateBossUI();
+                document.getElementById("wrongFeedback").innerText = "";
+                generateProblem();
+                battleStart = Date.now();
+                startBattleTimer();
+                document.getElementById("answerInput").value = "";
+                document.getElementById("answerInput").focus();
+                return;
+            }
+        } else {
+            score += 10;
+            spawnExplosion(currentMonster.x, currentMonster.y, 40);
+            flashes.push({ x: currentMonster.x, y: currentMonster.y, life: 1.0 });
+            currentMonster.dead = true;
+            killCount++;
+            totalKillCount++;
+            if (timeTaken <= parseFloat(document.getElementById("aoeInput").value) * 1000) aoeKill();
+            // Bug #1: !bossActive 가드 추가로 보스 중복 생성 방지
+            if (killCount >= parseInt(document.getElementById("bossSpawnInput").value) && !bossActive) spawnBoss();
+            finishBattle();
+        }
+        updateScore();
+    } else {
+        playerHp -= 20;
+        updateHpBar();
+        canvas.classList.add("shake-effect");
+        setTimeout(() => canvas.classList.remove("shake-effect"), 500);
+
+        if (playerHp <= 0) { endGame("게임 오버!"); return; }
+
+        // 오답: HP만 깎고 같은 문제 계속 진행
+        document.getElementById("wrongFeedback").innerText = "오답! 다시 시도하세요";
+        setTimeout(() => { document.getElementById("wrongFeedback").innerText = ""; }, 1500);
+
+        // 보기 선택 모드: 선택지 유지 (오답 버튼 강조만 초기화)
+        if (inputMode === 'choices') {
+            document.querySelectorAll('.choice-btn.wrong').forEach(b => {
+                b.classList.remove('wrong');
+                b.style.pointerEvents = '';
+            });
+        } else {
+            document.getElementById("answerInput").value = "";
+            document.getElementById("answerInput").focus();
+        }
+        battleStart = Date.now();
+        startBattleTimer();
+    }
+}
+
+function bossFinalExplosion() {
+    canvas.classList.add("shake-effect");
+    setTimeout(() => canvas.classList.remove("shake-effect"), 600);
+    for (let i = 0; i < 200; i++) effects.push({ x: currentMonster.x, y: currentMonster.y, vx: (Math.random()-0.5)*35, vy: (Math.random()-0.5)*35, life: 1.5, color: "yellow" });
+    stopSpeechRecognition();
+    currentMonster.dead = true;
+    bossActive = false;
+    killCount = 0;
+    // 잔여 일반 몬스터 전멸
+    monsters.forEach(m => { if (!m.dead && !m.boss) { spawnExplosion(m.x, m.y, 30); m.dead = true; score += 10; } });
+    updateScore();
+    // UX #7: 딜레이를 1200ms로 늘려 폭발 이펙트 중 새 몬스터 접근 완전 차단
+    setTimeout(() => {
+        monsters = monsters.filter(m => !m.dead);
+        battleMode = false;
+    }, 1200);
+}
+
+function finishBattle() {
+    stopSpeechRecognition();
+    document.getElementById("battleUI").style.display = "none";
+    const btn = document.getElementById('micTalkBtn');
+    if (btn) btn.style.display = 'none';
+    // 보기 초기화
+    const cc = document.getElementById('choicesContainer');
+    if (cc) { cc.classList.remove('active'); cc.innerHTML = ''; }
+    // 직접입력 복원
+    const ai = document.getElementById('answerInput');
+    if (ai) ai.style.display = '';
+    setTimeout(() => { battleMode = false; }, 300);
+}
+
+function aoeKill() {
+    monsters.forEach(m => {
+        if (!m.dead && !m.boss && m !== currentMonster) {
+            let d = Math.sqrt((m.x - currentMonster.x)**2 + (m.y - currentMonster.y)**2);
+            if (d < 250) { spawnExplosion(m.x, m.y, 30); m.dead = true; score += 10; flashes.push({ x: m.x, y: m.y, life: 0.8 }); }
+        }
+    });
+}
+
+function spawnExplosion(x, y, cnt) {
+    for (let i = 0; i < cnt; i++) effects.push({ x, y, vx: (Math.random()-0.5)*18, vy: (Math.random()-0.5)*18, life: 1.2, color: null });
+}
+
+function updateScore() { document.getElementById("scoreText").innerText = `SCORE: ${score}`; }
+function updateHpBar() {
+    document.getElementById("hpBar").style.width = playerHp + "%";
+    document.getElementById("hpPercentText").innerText = playerHp + "%";
+}
+
+function spawnBoss() {
+    bossActive = true;
+    // 잔여 일반 몬스터 즉시 제거 — finishBattle의 battleMode=false(300ms) 이후
+    // 일반 몬스터가 startBattle을 가로채 보스 배틀이 시작 안 되는 데드락 방지
+    monsters.forEach(m => { if (!m.dead && !m.boss) { spawnExplosion(m.x, m.y, 30); m.dead = true; score += 10; } });
+    updateScore();
+    let bHp = parseInt(document.getElementById("bossHpInput").value);
+    let bossObj = { x: canvas.width/2, y: 150, speed: 0, img: monsterImgs[2], boss: true, hp: bHp, maxHp: bHp, dead: false };
+    monsters.push(bossObj);
+    setTimeout(() => startBattle(bossObj), 500);
+}
+
+function updateBossUI() {
+    document.getElementById("bossHpBar").style.width = (currentMonster.hp / currentMonster.maxHp) * 100 + "%";
+}
+
+document.getElementById("answerInput").addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+        const userInput = document.getElementById("answerInput").value.trim();
+        if (userInput === correctAnswer) {
+            endBattle(true);
+        } else {
+            document.getElementById("answerInput").value = "";
+            endBattle(false);
+        }
+    }
+});
+
+// UX #9: alert 대신 게임 오버 모달 표시
+function endGame(msg, skipRanking = false) {
+    if (gameEnded) return; // 중복 호출 방지
+    gameEnded = true;
+    stopSpeechRecognition();
+    // Bug #4: gameRunning 플래그 해제로 spawnLoop 정지
+    gameRunning = false;
+    clearInterval(mainClock);
+    clearInterval(battleTimer);
+    battleMode = false;
+    document.getElementById("battleUI").style.display = "none";
+    document.getElementById("gameOverlay").style.display = "none";
+
+    document.getElementById("gameOverTitle").innerText = msg;
+    document.getElementById("gameOverScore").innerText = `SCORE: ${score}`;
+    document.getElementById("gameOverStats").innerText = `총 처치: ${totalKillCount}마리  |  남은 HP: ${Math.max(0, playerHp)}%`;
+
+    // 랭킹 저장 및 표시 (세션당 1회만 저장 — 계속 진행 후 중복 방지, 수동 중단 시 제외)
+    if (savedSettings && !skipRanking) {
+        const rankKey = getRankKey(savedSettings);
+        const badge = document.getElementById('myRankBadge');
+        if (!rankingSaved) {
+            rankingSaved = true;
+            const myIdx = saveRanking(rankKey, score, totalKillCount, savedSettings.nickname);
+            if (myIdx === -1) {
+                badge.innerText = '10위권 밖';
+            } else {
+                const rankNum = myIdx + 1;
+                badge.innerText = rankNum <= 3 ? `🎉 ${rankNum}위 진입!` : `${rankNum}위 기록!`;
+                badge.style.color = rankNum === 1 ? '#ffd700' : rankNum === 2 ? '#c0c0c0' : rankNum === 3 ? '#cd7f32' : '#aaa';
+            }
+        } else {
+            badge.innerText = '';
+        }
+        document.getElementById('rankingSection').innerHTML = renderRankingTable(rankKey, -1);
+    }
+
+    document.getElementById("gameOverModal").style.display = "flex";
+}
+
+// 게임 중단 없이 계속 진행
+function continueGame() {
+    document.getElementById("gameOverModal").style.display = "none";
+    document.getElementById("gameOverlay").style.display = "flex";
+    gameEnded = false;
+    gameRunning = true;
+    mainClock = setInterval(() => {
+        gameRemainTime--;
+        document.getElementById("gameClock").innerText = `TIME: ${gameRemainTime}s`;
+        if (gameRemainTime <= 0) endGame("시간 종료!");
+    }, 1000);
+    spawnLoop();
+}
+
+// 같은 설정으로 재시작
+function restartGame() {
+    // 상태 초기화
+    clearInterval(battleTimer);
+    monsters = []; effects = []; flashes = [];
+    slime = { x: canvas.width/2, y: canvas.height/2 };
+    battleMode = false; currentMonster = null;
+    correctAnswer = ""; battleStart = 0;
+    killCount = 0; totalKillCount = 0; bossActive = false; score = 0; playerHp = 100;
+
+    document.getElementById("gameOverModal").style.display = "none";
+    document.getElementById("hpBar").style.width = "100%";
+    document.getElementById("hpPercentText").innerText = "100%";
+    document.getElementById("scoreText").innerText = "SCORE: 0";
+
+    monsterMoveSpeed = savedSettings.monsterMoveSpeed;
+    gameRemainTime = savedSettings.gameRemainTime;
+    document.getElementById("gameClock").innerText = `TIME: ${gameRemainTime}s`;
+    document.getElementById("gameOverlay").style.display = "flex";
+
+    gameEnded = false;
+    rankingSaved = false;
+    gameRunning = true;
+    mainClock = setInterval(() => {
+        gameRemainTime--;
+        document.getElementById("gameClock").innerText = `TIME: ${gameRemainTime}s`;
+        if (gameRemainTime <= 0) endGame("시간 종료!");
+    }, 1000);
+    spawnLoop();
+}
+
+function update() {
+    if (gameRunning && !battleMode && gameRemainTime > 0) {
+        // 안전망: bossActive인데 배틀이 안 시작된 경우 강제 시작
+        if (bossActive) {
+            const boss = monsters.find(m => m.boss && !m.dead);
+            if (boss) startBattle(boss);
+        } else {
+            monsters.forEach(m => {
+                if (m.dead) return;
+                let dx = slime.x - m.x, dy = slime.y - m.y, d = Math.sqrt(dx*dx + dy*dy);
+                m.x += dx/d*m.speed; m.y += dy/d*m.speed;
+                // Bug #2: forEach 내부에서도 battleMode 재확인으로 같은 프레임 다중 배틀 차단
+                if (d < 80 && !battleMode) startBattle(m);
+            });
+        }
+    }
+    effects.forEach(e => { e.x += e.vx; e.y += e.vy; e.vy += 0.35; e.life -= 0.02; });
+    effects = effects.filter(e => e.life > 0);
+    flashes.forEach(f => f.life -= 0.1);
+    flashes = flashes.filter(f => f.life > 0);
+    monsters = monsters.filter(m => !m.dead);
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(slimeImg, slime.x-50, slime.y-50, 100, 100);
+    monsters.forEach(m => {
+        let size = m.boss ? 200 : 80;
+        ctx.drawImage(m.img, m.x-size/2, m.y-size/2, size, size);
+    });
+    flashes.forEach(f => {
+        ctx.beginPath(); ctx.arc(f.x, f.y, 60*f.life, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(255,255,255,${f.life*0.6})`; ctx.fill();
+    });
+    effects.forEach(e => {
+        ctx.fillStyle = e.color || `rgba(255,${Math.floor(e.life*255)},${Math.floor(e.life*100)},${e.life})`;
+        ctx.beginPath(); ctx.arc(e.x, e.y, 3, 0, Math.PI*2); ctx.fill();
+    });
+}
+
+function loop() { update(); draw(); requestAnimationFrame(loop); }
+</script>
+</body>
+</html>

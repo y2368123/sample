@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>마이크 테스트</title>
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: #111; color: white; font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+.container { background: #1a1a2e; border: 2px solid #444; border-radius: 20px; padding: 40px; width: min(500px, 96vw); text-align: center; }
+h1 { font-size: 24px; margin-bottom: 30px; color: #ffd700; }
+
+#statusDot {
+    width: 60px; height: 60px; border-radius: 50%;
+    background: #333; margin: 0 auto 20px;
+    transition: background 0.2s;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+}
+#statusDot.listening { background: #c00; animation: pulse 1.2s ease-in-out infinite; }
+#statusDot.got-result { background: #28a745; }
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+#statusText { font-size: 16px; color: #aaa; margin-bottom: 24px; min-height: 22px; }
+
+#transcriptBox {
+    background: #222; border: 1px solid #555; border-radius: 12px;
+    padding: 16px; min-height: 80px; font-size: 20px; color: #0f0;
+    word-break: break-all; margin-bottom: 24px; text-align: left;
+}
+#transcriptBox .placeholder { color: #444; font-style: italic; font-size: 15px; }
+
+#interimBox {
+    background: #1a1a1a; border: 1px dashed #444; border-radius: 8px;
+    padding: 10px; min-height: 36px; font-size: 15px; color: #888;
+    margin-bottom: 24px; text-align: left;
+}
+
+.btn {
+    padding: 14px 36px; font-size: 17px; border: none; border-radius: 30px;
+    cursor: pointer; font-weight: bold; transition: all 0.15s; margin: 6px;
+}
+#startBtn { background: #28a745; color: white; }
+#startBtn:hover { background: #1e8c38; }
+#startBtn.active { background: #c00; animation: pulse 1.2s ease-in-out infinite; }
+#clearBtn { background: #444; color: #ccc; }
+#clearBtn:hover { background: #555; }
+
+#log {
+    margin-top: 24px; background: #0d0d0d; border-radius: 10px;
+    padding: 12px; max-height: 200px; overflow-y: auto;
+    text-align: left; font-size: 13px; color: #777;
+}
+#log .entry { border-bottom: 1px solid #222; padding: 4px 0; }
+#log .entry.final { color: #0f0; }
+#log .entry.error { color: #f55; }
+#log .entry.info { color: #5af; }
+
+#noSupportMsg { display: none; color: #f55; font-size: 16px; margin-top: 16px; }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>🎤 마이크 테스트</h1>
+
+    <div id="statusDot">🎤</div>
+    <div id="statusText">버튼을 눌러 마이크를 시작하세요</div>
+
+    <div id="transcriptBox"><span class="placeholder">인식된 텍스트가 여기 표시됩니다</span></div>
+    <div id="interimBox" title="중간 인식 결과(실시간)">🔄 실시간: <span id="interimText" style="color:#aaa;"></span></div>
+
+    <button class="btn" id="startBtn" onclick="toggleRecognition()">▶ 시작</button>
+    <button class="btn" id="clearBtn" onclick="clearAll()">🗑 지우기</button>
+
+    <div id="noSupportMsg">⚠️ 이 브라우저는 Web Speech API를 지원하지 않습니다.<br>Chrome 또는 Edge를 사용해 주세요.</div>
+
+    <div id="log"></div>
+</div>
+
+<script>
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
+let isListening = false;
+
+function addLog(msg, type = 'info') {
+    const log = document.getElementById('log');
+    const entry = document.createElement('div');
+    entry.className = 'entry ' + type;
+    entry.textContent = new Date().toLocaleTimeString() + ' | ' + msg;
+    log.prepend(entry);
+}
+
+function setStatus(text, dotClass) {
+    document.getElementById('statusText').textContent = text;
+    const dot = document.getElementById('statusDot');
+    dot.className = dotClass || '';
+    dot.textContent = dotClass === 'listening' ? '🎙' : '🎤';
+}
+
+if (!SpeechRecognition) {
+    document.getElementById('noSupportMsg').style.display = 'block';
+    document.getElementById('startBtn').disabled = true;
+    addLog('Web Speech API 미지원 브라우저', 'error');
+} else {
+    recognition = new SpeechRecognition();
+    recognition.lang = 'ko-KR';
+    recognition.interimResults = true;
+    recognition.continuous = true;
+    recognition.maxAlternatives = 3;
+
+    recognition.onstart = () => {
+        isListening = true;
+        setStatus('🔴 녹음 중... 말씀해 주세요', 'listening');
+        document.getElementById('startBtn').textContent = '⏹ 중지';
+        document.getElementById('startBtn').classList.add('active');
+        addLog('인식 시작', 'info');
+    };
+
+    recognition.onend = () => {
+        isListening = false;
+        setStatus('인식 종료 — 버튼을 눌러 다시 시작하세요');
+        document.getElementById('statusDot').className = '';
+        document.getElementById('statusDot').textContent = '🎤';
+        document.getElementById('startBtn').textContent = '▶ 시작';
+        document.getElementById('startBtn').classList.remove('active');
+        document.getElementById('interimText').textContent = '';
+        addLog('인식 종료', 'info');
+    };
+
+    recognition.onerror = (e) => {
+        addLog('오류: ' + e.error, 'error');
+        if (e.error === 'not-allowed') {
+            setStatus('❌ 마이크 권한이 거부되었습니다. 브라우저 설정을 확인하세요.');
+        } else if (e.error === 'no-speech') {
+            addLog('음성 없음 (계속 대기)', 'info');
+        }
+    };
+
+    recognition.onresult = (e) => {
+        let interim = '';
+
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+            const result = e.results[i];
+            if (result.isFinal) {
+                const alts = [];
+                for (let j = 0; j < result.length; j++) {
+                    alts.push(`"${result[j].transcript.trim()}" (${(result[j].confidence * 100).toFixed(0)}%)`);
+                }
+                addLog('인식: ' + alts.join(' | '), 'final');
+
+                const box = document.getElementById('transcriptBox');
+                box.querySelectorAll('.placeholder').forEach(el => el.remove());
+                const span = document.createElement('div');
+                span.textContent = result[0].transcript.trim();
+                box.appendChild(span);
+                box.scrollTop = box.scrollHeight;
+
+                document.getElementById('statusDot').className = 'got-result';
+                setTimeout(() => {
+                    if (isListening) document.getElementById('statusDot').className = 'listening';
+                }, 600);
+            } else {
+                interim += result[0].transcript;
+            }
+        }
+        document.getElementById('interimText').textContent = interim;
+    };
+
+    addLog('Web Speech API 지원 확인됨', 'info');
+}
+
+function toggleRecognition() {
+    if (!recognition) return;
+    if (isListening) {
+        recognition.stop();
+    } else {
+        try { recognition.start(); } catch(e) { addLog('시작 실패: ' + e.message, 'error'); }
+    }
+}
+
+function clearAll() {
+    const box = document.getElementById('transcriptBox');
+    box.innerHTML = '<span class="placeholder">인식된 텍스트가 여기 표시됩니다</span>';
+    document.getElementById('interimText').textContent = '';
+    document.getElementById('log').innerHTML = '';
+    addLog('초기화', 'info');
+}
+</script>
+</body>
+</html>
