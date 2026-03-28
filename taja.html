@@ -2123,6 +2123,7 @@ function renderRanking(currentAvg) {
 
 // ─── 설정 저장/로드 ───
 function saveSettings() {
+  if (_loadingSettings) return;
   const data = {
     lang: cfg.lang,
     mode: cfg.mode,
@@ -2132,11 +2133,13 @@ function saveSettings() {
   };
   try { localStorage.setItem('typingBattleSettings', JSON.stringify(data)); } catch(e) {}
 }
+let _loadingSettings = false;
 function loadSettings() {
   try {
     const raw = localStorage.getItem('typingBattleSettings');
     if (!raw) return;
     const data = JSON.parse(raw);
+    _loadingSettings = true; // 로딩 중에는 saveSettings 방지
     if (data.lang) selectLang(data.lang);
     if (data.mode) selectMode(data.mode);
     if (data.diff) selectDiff(data.diff);
@@ -2145,7 +2148,8 @@ function loadSettings() {
       cfg.mySpeed = data.mySpeed;
       document.getElementById('speed-input').value = data.mySpeed;
     }
-  } catch(e) {}
+    _loadingSettings = false;
+  } catch(e) { _loadingSettings = false; }
 }
 
 // 설정 변경 시 자동 저장
