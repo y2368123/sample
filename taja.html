@@ -1530,6 +1530,7 @@ function startGame() {
   const speedVal = parseInt(document.getElementById('speed-input').value);
   if (isNaN(speedVal) || speedVal < 10) { showPopup('속도를 입력해주세요!'); return; }
   cfg.mySpeed = speedVal;
+  saveSettings();
   gameState.round = 1;
   gameState.playerScore = 0;
   gameState.monsterScore = 0;
@@ -2156,10 +2157,6 @@ const _origSelectDiff = selectDiff;
 selectDiff = function(d) { _origSelectDiff(d); saveSettings(); };
 const _origSelectRounds = selectRounds;
 selectRounds = function(r) { _origSelectRounds(r); saveSettings(); };
-document.getElementById('speed-input').addEventListener('input', () => {
-  const v = parseInt(document.getElementById('speed-input').value);
-  if (v && v > 0) { cfg.mySpeed = v; saveSettings(); }
-});
 
 // ─── 초기화 ───
 setupBgDeco();
