@@ -107,7 +107,7 @@
     align-items: center;
     gap: 10px;
   }
-  .speed-input-row input[type="number"] {
+  .speed-input-row input {
     width: 90px;
     padding: 8px 12px;
     border-radius: 8px;
@@ -390,6 +390,57 @@
   }
   #word-display.long-text { font-size: 1.8rem; letter-spacing: 0.04em; }
   #word-display.very-long-text { font-size: 1.3rem; letter-spacing: 0.02em; }
+  /* ─── 키보드 시각화 ─── */
+  #kb-visual { display: none; width: 100%; max-width: 700px; }
+  #kb-visual.active { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .kb-row-label {
+    font-size: 0.7rem; color: #64748b; letter-spacing: 0.05em; margin-bottom: 2px; text-align: center;
+  }
+  .kb-row {
+    display: flex; gap: 4px; justify-content: center;
+  }
+  .kb-key {
+    width: 44px; height: 44px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 7px;
+    font-size: 0.85rem; font-weight: 600;
+    border: 2px solid rgba(100,116,139,0.25);
+    background: rgba(30,20,50,0.6);
+    color: #64748b;
+    transition: all 0.15s;
+    position: relative;
+  }
+  .kb-key.in-row {
+    border-color: rgba(168,85,247,0.35);
+    color: #a78bfa;
+    background: rgba(60,30,100,0.4);
+  }
+  .kb-key.highlight {
+    border-color: #fbbf24;
+    color: #fbbf24;
+    background: rgba(251,191,36,0.18);
+    box-shadow: 0 0 14px rgba(251,191,36,0.4);
+    transform: scale(1.12);
+    z-index: 2;
+  }
+  .kb-key.done {
+    border-color: rgba(134,239,172,0.4);
+    color: #86efac;
+    background: rgba(134,239,172,0.1);
+  }
+  .kb-key .kb-sub {
+    position: absolute; top: 2px; right: 4px;
+    font-size: 0.5rem; color: #475569; font-weight: normal;
+  }
+  .kb-finger-guide {
+    margin-top: 4px;
+    font-size: 0.82rem;
+    color: #fbbf24;
+    text-align: center;
+    min-height: 1.2em;
+    text-shadow: 0 0 6px rgba(251,191,36,0.5);
+  }
+
   #word-translation {
     margin-top: 6px;
     font-size: 0.95rem;
@@ -497,6 +548,43 @@
     caret-color: #a855f7;
   }
   #game-input:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,0.2); }
+  #game-input.wrong-lang {
+    border-color: #ef4444 !important;
+    box-shadow: 0 0 0 3px rgba(239,68,68,0.3) !important;
+    animation: wrongLangShake 0.3s ease-out;
+  }
+  @keyframes wrongLangShake {
+    0%,100% { transform: translateX(0); }
+    20% { transform: translateX(-4px); }
+    40% { transform: translateX(4px); }
+    60% { transform: translateX(-3px); }
+    80% { transform: translateX(3px); }
+  }
+  #lang-badge {
+    position: absolute;
+    top: -28px;
+    right: 0;
+    font-size: 0.75rem;
+    font-weight: bold;
+    padding: 3px 10px;
+    border-radius: 6px;
+    letter-spacing: 0.04em;
+  }
+  #lang-badge.ko { background: rgba(96,165,250,0.2); color: #93c5fd; border: 1px solid rgba(96,165,250,0.4); }
+  #lang-badge.en { background: rgba(251,191,36,0.2); color: #fbbf24; border: 1px solid rgba(251,191,36,0.4); }
+  #lang-warning {
+    position: absolute;
+    bottom: -24px;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 0.78rem;
+    color: #ef4444;
+    font-weight: bold;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+  }
+  #lang-warning.visible { opacity: 1; }
 
   /* 상태바 */
   #status-bar {
@@ -759,7 +847,7 @@
     <div class="setup-section">
       <div class="setup-label">⚡ 내 타이핑 속도 (타/분)</div>
       <div class="speed-input-row">
-        <input type="number" id="speed-input" value="200" min="30" max="900" placeholder="타/분">
+        <input type="text" id="speed-input" value="200" placeholder="타/분" autocomplete="off">
         <span>타/분</span>
         <button class="measure-btn" onclick="openMeasure()">🔬 측정하기</button>
       </div>
@@ -833,6 +921,13 @@
 
   <!-- 문제 영역 -->
   <div id="word-zone">
+    <!-- 키보드 시각화 (줄별 연습 모드에서만 표시) -->
+    <div id="kb-visual">
+      <div class="kb-row" id="kb-row-top"></div>
+      <div class="kb-row" id="kb-row-mid"></div>
+      <div class="kb-row" id="kb-row-bot"></div>
+      <div class="kb-finger-guide" id="kb-finger-guide"></div>
+    </div>
     <div id="word-display"></div>
     <div id="word-translation"></div>
     <div id="player-progress-row">
@@ -848,10 +943,14 @@
       <div class="avatar-name player">YOU</div>
       <div class="medal-row" id="player-medals"></div>
     </div>
-    <div id="input-area">
+    <div id="input-area" style="position:relative;">
       <div id="target-mirror"></div>
       <div id="typed-display"></div>
-      <input type="text" id="game-input" placeholder="타이핑하세요..." autocomplete="off" spellcheck="false">
+      <div style="position:relative;">
+        <div id="lang-badge"></div>
+        <input type="text" id="game-input" placeholder="타이핑하세요..." autocomplete="off" spellcheck="false">
+        <div id="lang-warning"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -1128,6 +1227,142 @@ function buildSyllable(con, vow) {
   if (ci < 0 || vi < 0) return null;
   return String.fromCharCode(0xAC00 + ci * 21 * 28 + vi * 28);
 }
+// 키보드 전체 레이아웃 (영문 기준 + 한글 매핑)
+const KB_LAYOUT = [
+  { id:'top', keys:'qwertyuiop', ko:['ㅂ','ㅈ','ㄷ','ㄱ','ㅅ','ㅛ','ㅕ','ㅑ','ㅐ','ㅔ'] },
+  { id:'mid', keys:'asdfghjkl',  ko:['ㅁ','ㄴ','ㅇ','ㄹ','ㅎ','ㅗ','ㅓ','ㅏ','ㅣ'] },
+  { id:'bot', keys:'zxcvbnm',    ko:['ㅋ','ㅌ','ㅊ','ㅍ','ㅠ','ㅜ','ㅡ'] },
+];
+// 한글 자모 → 영문 키 매핑 (역방향 조회용)
+const JAMO_TO_KEY = {};
+KB_LAYOUT.forEach(row => {
+  for (let i = 0; i < row.ko.length; i++) {
+    JAMO_TO_KEY[row.ko[i]] = { key: row.keys[i], rowId: row.id };
+  }
+});
+// 손가락 가이드
+const FINGER_GUIDE = {
+  q:'왼손 새끼',w:'왼손 약지',e:'왼손 중지',r:'왼손 검지',t:'왼손 검지',
+  y:'오른손 검지',u:'오른손 검지',i:'오른손 중지',o:'오른손 약지',p:'오른손 새끼',
+  a:'왼손 새끼',s:'왼손 약지',d:'왼손 중지',f:'왼손 검지',g:'왼손 검지',
+  h:'오른손 검지',j:'오른손 검지',k:'오른손 중지',l:'오른손 약지',
+  z:'왼손 새끼',x:'왼손 약지',c:'왼손 중지',v:'왼손 검지',
+  b:'오른손 검지',n:'오른손 검지',m:'오른손 중지',
+};
+
+function renderKeyboard(activeMode) {
+  const kbVisual = document.getElementById('kb-visual');
+  if (!isKbRowMode()) { kbVisual.classList.remove('active'); return; }
+  kbVisual.classList.add('active');
+
+  const activeRowId = { top_row:'top', mid_row:'mid', bot_row:'bot' }[activeMode];
+  const isKo = cfg.lang === 'ko';
+
+  KB_LAYOUT.forEach(row => {
+    const el = document.getElementById('kb-row-' + row.id);
+    let html = '';
+    for (let i = 0; i < row.keys.length; i++) {
+      const enKey = row.keys[i];
+      const koKey = row.ko[i] || '';
+      const inRow = row.id === activeRowId;
+      const label = isKo ? koKey : enKey;
+      const sub = isKo ? enKey : '';
+      html += `<div class="kb-key ${inRow?'in-row':''}" data-en="${enKey}" data-ko="${koKey}">`;
+      html += label;
+      if (sub) html += `<span class="kb-sub">${sub}</span>`;
+      html += '</div>';
+    }
+    el.innerHTML = html;
+  });
+  document.getElementById('kb-finger-guide').textContent = '';
+}
+
+function highlightKey(char) {
+  // 기존 하이라이트 제거
+  document.querySelectorAll('.kb-key.highlight').forEach(k => k.classList.remove('highlight'));
+  const guide = document.getElementById('kb-finger-guide');
+
+  if (!char) { guide.textContent = ''; return; }
+
+  const isKo = cfg.lang === 'ko';
+  let targetEnKey = '';
+
+  if (isKo) {
+    // 한글 음절을 초성/중성으로 분해하여 다음에 칠 자모 찾기
+    const code = char.charCodeAt(0);
+    if (code >= 0xAC00 && code <= 0xD7A3) {
+      const offset = code - 0xAC00;
+      const choIdx = Math.floor(offset / (21 * 28));
+      const jungIdx = Math.floor((offset % (21 * 28)) / 28);
+      const choJamo = CHO[choIdx];
+      const jungJamo = JUNG[jungIdx];
+      // 초성 키 하이라이트
+      if (JAMO_TO_KEY[choJamo]) {
+        targetEnKey = JAMO_TO_KEY[choJamo].key;
+        highlightSingleKey(targetEnKey);
+      }
+      // 중성도 서브 하이라이트 (두번째로 눌러야 할 키)
+      if (JAMO_TO_KEY[jungJamo]) {
+        const vowelKey = JAMO_TO_KEY[jungJamo].key;
+        const vowelEl = document.querySelector(`.kb-key[data-en="${vowelKey}"]`);
+        if (vowelEl) vowelEl.classList.add('highlight');
+        guide.textContent = `${FINGER_GUIDE[targetEnKey]||''} → ${choJamo}  +  ${FINGER_GUIDE[vowelKey]||''} → ${jungJamo}`;
+        return;
+      }
+      guide.textContent = FINGER_GUIDE[targetEnKey] ? `${FINGER_GUIDE[targetEnKey]} → ${choJamo}` : '';
+      return;
+    }
+    // 자모 단독
+    if (JAMO_TO_KEY[char]) {
+      targetEnKey = JAMO_TO_KEY[char].key;
+    }
+  } else {
+    targetEnKey = char.toLowerCase();
+  }
+
+  if (targetEnKey) {
+    highlightSingleKey(targetEnKey);
+    guide.textContent = FINGER_GUIDE[targetEnKey] ? `${FINGER_GUIDE[targetEnKey]} 손가락` : '';
+  } else {
+    guide.textContent = '';
+  }
+}
+
+function highlightSingleKey(enKey) {
+  const el = document.querySelector(`.kb-key[data-en="${enKey}"]`);
+  if (el) el.classList.add('highlight');
+}
+
+function markKeyDone(char) {
+  const isKo = cfg.lang === 'ko';
+  let enKey = '';
+  if (isKo && JAMO_TO_KEY[char]) {
+    enKey = JAMO_TO_KEY[char].key;
+  } else if (!isKo) {
+    enKey = char.toLowerCase();
+  }
+  // 음절인 경우 초성/중성 모두 done 처리
+  if (isKo) {
+    const code = char.charCodeAt(0);
+    if (code >= 0xAC00 && code <= 0xD7A3) {
+      const offset = code - 0xAC00;
+      const choJamo = CHO[Math.floor(offset / (21 * 28))];
+      const jungJamo = JUNG[Math.floor((offset % (21 * 28)) / 28)];
+      [choJamo, jungJamo].forEach(j => {
+        if (JAMO_TO_KEY[j]) {
+          const el = document.querySelector(`.kb-key[data-en="${JAMO_TO_KEY[j].key}"]`);
+          if (el) { el.classList.add('done'); setTimeout(() => el.classList.remove('done'), 400); }
+        }
+      });
+      return;
+    }
+  }
+  if (enKey) {
+    const el = document.querySelector(`.kb-key[data-en="${enKey}"]`);
+    if (el) { el.classList.add('done'); setTimeout(() => el.classList.remove('done'), 400); }
+  }
+}
+
 function generateKbWord(mode, lang, len) {
   const row = KB_ROWS[mode];
   if (!row) return 'test';
@@ -1383,6 +1618,8 @@ function startRound() {
   document.getElementById('stat-round').textContent = `${gameState.round}/${cfg.totalRounds}`;
   document.getElementById('stat-my-speed').textContent = cfg.mySpeed;
 
+  renderKeyboard(cfg.mode);
+  updateLangBadge();
   renderWordDisplay();
   renderTypedDisplay();
   updateMonsterDisplay();
@@ -1484,9 +1721,66 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+function isKoreanChar(ch) { return /[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(ch); }
+function isEnglishChar(ch) { return /[a-zA-Z]/.test(ch); }
+
+function checkLangMismatch(val) {
+  const input = document.getElementById('game-input');
+  const warning = document.getElementById('lang-warning');
+  if (!val || val.length === 0) {
+    input.classList.remove('wrong-lang');
+    warning.classList.remove('visible');
+    return;
+  }
+  const lastChar = val[val.length - 1];
+  let mismatch = false;
+  if (cfg.lang === 'ko' && isEnglishChar(lastChar)) {
+    mismatch = true;
+    warning.textContent = '⚠ 한/영 키를 눌러 한글로 전환하세요!';
+  } else if (cfg.lang === 'en' && isKoreanChar(lastChar)) {
+    mismatch = true;
+    warning.textContent = '⚠ Press 한/영 to switch to English!';
+  }
+  if (mismatch) {
+    input.classList.add('wrong-lang');
+    warning.classList.add('visible');
+    // 잘못된 입력 자동 삭제
+    const corrected = val.slice(0, -1);
+    input.value = corrected;
+    gameState.playerTyped = corrected;
+    // 잠시 후 경고 숨김
+    clearTimeout(checkLangMismatch._timer);
+    checkLangMismatch._timer = setTimeout(() => {
+      input.classList.remove('wrong-lang');
+      warning.classList.remove('visible');
+    }, 2000);
+    return true; // mismatch detected
+  }
+  input.classList.remove('wrong-lang');
+  warning.classList.remove('visible');
+  return false;
+}
+
+function updateLangBadge() {
+  const badge = document.getElementById('lang-badge');
+  if (cfg.lang === 'ko') {
+    badge.textContent = '한글';
+    badge.className = 'ko';
+  } else {
+    badge.textContent = 'ENG';
+    badge.className = 'en';
+  }
+}
+
 function onPlayerInput(e) {
   if (gameState.roundOver) return;
   const val = e.target.value;
+  // 언어 불일치 감지 (조합 중이 아닐 때만)
+  if (!isComposing && checkLangMismatch(val)) {
+    renderWordDisplay();
+    renderTypedDisplay();
+    return;
+  }
   const word = gameState.currentWord;
   if (!gameState.playerStartTime && val.length > 0) gameState.playerStartTime = Date.now();
   gameState.playerTyped = val;
@@ -1560,6 +1854,20 @@ function renderWordDisplay() {
     mirrorHtml += `<span class="${cls}">${word[i] === ' ' ? '&nbsp;' : escHtml(word[i])}</span>`;
   }
   document.getElementById('target-mirror').innerHTML = mirrorHtml;
+
+  // 키보드 줄 모드: 다음에 쳐야 할 키 하이라이트
+  if (isKbRowMode()) {
+    const nextIdx = typed.length;
+    if (nextIdx < word.length) {
+      highlightKey(word[nextIdx]);
+    } else {
+      highlightKey(null);
+    }
+    // 방금 입력한 글자에 done 효과
+    if (typed.length > 0) {
+      markKeyDone(typed[typed.length - 1]);
+    }
+  }
 }
 function renderTypedDisplay() {
   const word = gameState.currentWord;
