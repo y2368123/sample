@@ -141,6 +141,34 @@ h1 {
 }
 .card-math .badge { background: rgba(68,255,68,0.15); color: #44ff44; border: 1px solid #44ff4440; }
 .card-taja .badge { background: rgba(100,120,255,0.15); color: #8899ff; border: 1px solid #6478ff40; }
+
+.card-math-plus {
+    background: linear-gradient(145deg, #1a1f0a, #2a3a0a);
+    border-color: #4a7a10;
+}
+.card-math-plus:hover {
+    box-shadow: 0 12px 40px rgba(120,255,50,0.3);
+    border-color: #aaff44;
+}
+.card-math-plus::before {
+    background: radial-gradient(circle at 50% 0%, rgba(120,255,50,0.1), transparent 70%);
+}
+.card-math-plus .card-title { color: #aaff44; }
+.card-math-plus .badge { background: rgba(120,255,50,0.15); color: #aaff44; border: 1px solid #aaff4440; }
+
+.card-taja-plus {
+    background: linear-gradient(145deg, #15082a, #28105a);
+    border-color: #5a30aa;
+}
+.card-taja-plus:hover {
+    box-shadow: 0 12px 40px rgba(180,100,255,0.35);
+    border-color: #c070ff;
+}
+.card-taja-plus::before {
+    background: radial-gradient(circle at 50% 0%, rgba(180,100,255,0.12), transparent 70%);
+}
+.card-taja-plus .card-title { color: #c070ff; }
+.card-taja-plus .badge { background: rgba(180,100,255,0.15); color: #c070ff; border: 1px solid #c070ff40; }
 </style>
 </head>
 <body>
@@ -161,6 +189,20 @@ h1 {
         <div class="card-icon">⌨️</div>
         <div class="card-title">타자 배틀</div>
         <div class="card-desc">날아오는 단어를<br>빠르게 타이핑하라!</div>
+    </a>
+
+    <a class="card card-math-plus" href="math_1.html">
+        <span class="badge">MATH +</span>
+        <div class="card-icon">🧮✨</div>
+        <div class="card-title">슬라임 수학대전 +</div>
+        <div class="card-desc">콤보·효과음·일시정지<br>강화된 개선판!</div>
+    </a>
+
+    <a class="card card-taja-plus" href="taja_1.html">
+        <span class="badge">TYPING +</span>
+        <div class="card-icon">⌨️✨</div>
+        <div class="card-title">타자 배틀 +</div>
+        <div class="card-desc">콤보·효과음·정확도<br>강화된 개선판!</div>
     </a>
 </div>
 
