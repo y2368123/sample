@@ -811,17 +811,14 @@
 
   /* ─── 개선판 배지 ─── */
   #v2-badge {
-    position: fixed;
-    top: 48px; right: 8px;
     background: linear-gradient(135deg,#7c3aed,#a855f7);
     color: #fff;
-    font-size: 0.65rem;
+    font-size: 0.62rem;
     font-weight: bold;
-    padding: 2px 8px;
+    padding: 2px 7px;
     border-radius: 10px;
-    z-index: 25;
     letter-spacing: 0.5px;
-    pointer-events: none;
+    flex-shrink: 0;
   }
 
   /* 파티클 */
@@ -969,8 +966,8 @@
     </div>
     <div id="accuracy-display">정확도<span id="stat-accuracy">-</span>%</div>
     <div class="status-item">내 속도 <span id="stat-my-speed">-</span> 타/분</div>
+    <div id="v2-badge">v2</div>
   </div>
-  <div id="v2-badge">개선판 v2</div>
 
   <div id="countdown-overlay" class="hidden">
     <div id="countdown-number"></div>
