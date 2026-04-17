@@ -39,32 +39,32 @@
   <div class="input-area">
     <div class="input-box">
       <h3>모험가 입력</h3>
-      <p>파일 업로드 또는 아래 textarea에 <code>포인트 수량</code> 형식으로 입력 (탭/공백 구분, 한 줄에 하나)</p>
+      <p>파일 업로드 또는 아래 textarea에 <code>포인트,수량</code> 형식으로 입력 (쉼표 구분, 한 줄에 하나)</p>
       <input type="file" id="fileInput" accept=".txt,.csv,.tsv">
-      <textarea id="advInput" placeholder="예)&#10;10    12&#10;30    3&#10;36    7&#10;...">10	12
-30	3
-36	7
-42	2
-50	8
-60	4
-154	1
-168	2
-180	1
-182	8
-196	1
-200	3
-210	1
-220	6
-240	4
-260	2
-270	1
-280	1
-300	1
-320	1
-360	2
-600	1
-660	1
-800	2</textarea>
+      <textarea id="advInput" placeholder="예)&#10;10,12&#10;30,3&#10;36,7&#10;...">10,12
+30,3
+36,7
+42,2
+50,8
+60,4
+154,1
+168,2
+180,1
+182,8
+196,1
+200,3
+210,1
+220,6
+240,4
+260,2
+270,1
+280,1
+300,1
+320,1
+360,2
+600,1
+660,1
+800,2</textarea>
     </div>
     <div class="input-box">
       <h3>옵션</h3>
@@ -100,7 +100,7 @@ function parseInput(text) {
   const advs = [];
   const lines = text.trim().split(/\n/);
   for (const line of lines) {
-    const m = line.trim().match(/^(\d+)[\s,]+(\d+)/);
+    const m = line.trim().match(/^(\d+)\s*,\s*(\d+)/);
     if (!m) continue;
     const p = parseInt(m[1]), c = parseInt(m[2]);
     for (let i = 0; i < c; i++) advs.push(p);
