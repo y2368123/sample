@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>탐험 지역 모험가 배치 최적화</title>
+<style>
+  body { font-family: "Malgun Gothic", sans-serif; margin: 20px; background: #f4f4f4; }
+  h1 { color: #333; }
+  .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 1200px; margin: auto; }
+  .input-area { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
+  .input-box { flex: 1; min-width: 300px; }
+  textarea { width: 100%; height: 280px; font-family: Consolas, monospace; padding: 8px; box-sizing: border-box; }
+  input[type=file] { margin-bottom: 10px; }
+  .options { margin: 15px 0; padding: 12px; background: #eef; border-radius: 4px; }
+  button { background: #4a90e2; color: white; padding: 10px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 15px; }
+  button:hover { background: #357abd; }
+  table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+  th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+  th { background: #4a90e2; color: white; }
+  tr:nth-child(even) { background: #f9f9f9; }
+  .grade-UUR { background: #ffcccc !important; font-weight: bold; }
+  .grade-UR { background: #ffddcc !important; font-weight: bold; }
+  .grade-U { background: #ffeecc !important; }
+  .grade-SSS { background: #ffffcc !important; }
+  .grade-SS { background: #eeffcc !important; }
+  .grade-S { background: #ddffcc !important; }
+  .grade-A { background: #ccffdd !important; }
+  .grade-B { background: #ccffff !important; }
+  .grade-C { background: #ccddff !important; }
+  .grade-D { background: #ddccff !important; }
+  .summary { margin-top: 15px; padding: 12px; background: #dfd; border-left: 4px solid #4c4; font-size: 16px; }
+  .error { color: red; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>탐험 지역 모험가 배치 최적화</h1>
+
+  <div class="input-area">
+    <div class="input-box">
+      <h3>모험가 입력</h3>
+      <p>파일 업로드 또는 아래 textarea에 <code>포인트 수량</code> 형식으로 입력 (탭/공백 구분, 한 줄에 하나)</p>
+      <input type="file" id="fileInput" accept=".txt,.csv,.tsv">
+      <textarea id="advInput" placeholder="예)&#10;10    12&#10;30    3&#10;36    7&#10;...">10	12
+30	3
+36	7
+42	2
+50	8
+60	4
+154	1
+168	2
+180	1
+182	8
+196	1
+200	3
+210	1
+220	6
+240	4
+260	2
+270	1
+280	1
+300	1
+320	1
+360	2
+600	1
+660	1
+800	2</textarea>
+    </div>
+    <div class="input-box">
+      <h3>옵션</h3>
+      <div class="options">
+        <label><input type="checkbox" id="optHeaven4"> 천계 4지역 포함 (기본 3지역)</label>
+      </div>
+      <button onclick="runOptimize()">배치 계산</button>
+      <div id="error" class="error"></div>
+      <div id="summary" class="summary" style="display:none"></div>
+    </div>
+  </div>
+
+  <div id="resultArea"></div>
+</div>
+
+<script>
+const CONTINENTS_BASE = [
+  { name: '천계', req: [3000,2500,2100,1800,1500,1200,900,600,300,10], regions: 3,
+    hourly: [9500,9000,8500,8000,7500,7000,6500,6000,5500,5000] },
+  { name: '남부', req: [800,700,600,550,440,340,240,160,80,10], regions: 4,
+    hourly: [5690,5360,5030,4700,4370,4030,3700,3360,2690,2016] },
+  { name: '동부', req: [700,600,500,450,340,260,180,120,60,10], regions: 4,
+    hourly: [6080,5400,4720,4040,3740,3460,3160,2880,2300,1728] },
+  { name: '서부', req: [600,500,400,350,270,210,150,100,50,10], regions: 4,
+    hourly: [5070,4500,3930,3360,3120,2880,2640,2400,1920,1440] },
+  { name: '중앙', req: [500,400,300,250,190,140,90,60,30,10], regions: 4,
+    hourly: [4140,3660,3180,2700,2520,2280,2100,1920,1560,1152] },
+];
+const GRADES = ['UUR','UR','U','SSS','SS','S','A','B','C','D'];
+const SLOT = 5;
+
+function parseInput(text) {
+  const advs = [];
+  const lines = text.trim().split(/\n/);
+  for (const line of lines) {
+    const m = line.trim().match(/^(\d+)[\s,]+(\d+)/);
+    if (!m) continue;
+    const p = parseInt(m[1]), c = parseInt(m[2]);
+    for (let i = 0; i < c; i++) advs.push(p);
+  }
+  advs.sort((a,b) => b-a);
+  return advs;
+}
+
+// DP: 풀에서 k개 이하 선택하여 합>=target 중 합 최소. 리턴: {indices, sum, waste} 또는 null
+function findMinWaste(pool, target, maxK = SLOT) {
+  const n = pool.length;
+  // reachable: Map<"j,s", [prevJ, prevS, idxUsed] | null>
+  const reachable = new Map();
+  reachable.set('0,0', null);
+  const maxSum = target + 5000;
+  for (let i = 0; i < n; i++) {
+    const p = pool[i];
+    const newEntries = [];
+    for (const [key, _] of reachable) {
+      const [j, s] = key.split(',').map(Number);
+      if (j >= maxK) continue;
+      const ns = s + p;
+      if (ns > maxSum) continue;
+      const nk = (j+1) + ',' + ns;
+      if (!reachable.has(nk) && !newEntries.some(e => e[0] === nk)) {
+        newEntries.push([nk, [j, s, i]]);
+      }
+    }
+    for (const [k, v] of newEntries) reachable.set(k, v);
+  }
+  let best = null;
+  for (const [key, _] of reachable) {
+    const [j, s] = key.split(',').map(Number);
+    if (j > 0 && s >= target) {
+      if (!best || s < best.s || (s === best.s && j < best.j)) {
+        best = { j, s, key };
+      }
+    }
+  }
+  if (!best) return null;
+  // 경로 복원
+  const indices = [];
+  let curKey = best.key;
+  while (curKey !== '0,0') {
+    const v = reachable.get(curKey);
+    if (!v) break;
+    const [pj, ps, idx] = v;
+    indices.push(idx);
+    curKey = pj + ',' + ps;
+  }
+  indices.sort((a,b) => a-b);
+  return { indices, sum: best.s, waste: best.s - target };
+}
+
+function assignRegion(pool, reqList, hourlyList) {
+  for (let gi = 0; gi < reqList.length; gi++) {
+    const req = reqList[gi];
+    const top5Sum = pool.slice(0, SLOT).reduce((a,b) => a+b, 0);
+    if (top5Sum < req) continue;
+    const result = findMinWaste(pool, req, SLOT);
+    if (result) {
+      const picked = result.indices.map(i => pool[i]);
+      const remaining = pool.filter((_, i) => !result.indices.includes(i));
+      return { picked, grade: GRADES[gi], hourly: hourlyList[gi], req, remaining };
+    }
+  }
+  if (pool.length > 0) {
+    return { picked: pool.slice(0, SLOT), grade: 'D', hourly: hourlyList[hourlyList.length-1], req: 10, remaining: pool.slice(SLOT) };
+  }
+  return { picked: [], grade: 'none', hourly: 0, req: 0, remaining: pool };
+}
+
+function runOptimize() {
+  document.getElementById('error').textContent = '';
+  try {
+    const text = document.getElementById('advInput').value;
+    const pool0 = parseInput(text);
+    if (pool0.length === 0) throw new Error('유효한 모험가 데이터가 없습니다.');
+
+    const heaven4 = document.getElementById('optHeaven4').checked;
+    const continents = CONTINENTS_BASE.map(c => ({ ...c }));
+    if (heaven4) continents[0].regions = 4;
+
+    let pool = [...pool0];
+    const results = {};
+    for (const cont of continents) {
+      const contRes = [];
+      for (let i = 0; i < cont.regions; i++) {
+        const r = assignRegion(pool, cont.req, cont.hourly);
+        contRes.push(r);
+        pool = r.remaining;
+      }
+      results[cont.name] = contRes;
+    }
+
+    // 출력: 중앙 → 서부 → 동부 → 남부 → 천계, 각 대륙 내 번호 낮은 순(낮은 등급 먼저)
+    const printOrder = ['중앙','서부','동부','남부','천계'];
+    let html = '<table><thead><tr><th>지역</th><th>배치 모험가 포인트</th><th>인원</th><th>합계</th><th>낭비</th><th>등급</th><th>시간당 금화</th></tr></thead><tbody>';
+    let totalHourly = 0;
+    let totalWaste = 0;
+    for (const name of printOrder) {
+      const res = results[name];
+      if (!res) continue;
+      // 역순 (높은 번호 = 높은 등급)
+      const sorted = [...res].reverse();
+      for (let i = 0; i < sorted.length; i++) {
+        const r = sorted[i];
+        const regionName = `${name}${i+1}`;
+        const pts = r.picked.join(', ') || '-';
+        const sum = r.picked.reduce((a,b) => a+b, 0);
+        const waste = sum > 0 ? sum - r.req : 0;
+        totalHourly += r.hourly;
+        totalWaste += waste;
+        html += `<tr class="grade-${r.grade}"><td>${regionName}</td><td>${pts}</td><td>${r.picked.length}</td><td>${sum}</td><td>${waste}</td><td>${r.grade}</td><td>${r.hourly.toLocaleString()}</td></tr>`;
+      }
+    }
+    html += '</tbody></table>';
+    document.getElementById('resultArea').innerHTML = html;
+
+    const summary = document.getElementById('summary');
+    summary.style.display = 'block';
+    summary.innerHTML = `총 모험가: <b>${pool0.length}명</b> · 총 포인트: <b>${pool0.reduce((a,b)=>a+b,0).toLocaleString()}</b> · 남은 모험가: <b>${pool.length}명 (${pool.reduce((a,b)=>a+b,0)}p)</b> · 총 낭비: <b>${totalWaste}p</b><br>총 시간당 금화: <b style="font-size:20px;color:#c40">${totalHourly.toLocaleString()}</b>`;
+  } catch (e) {
+    document.getElementById('error').textContent = '에러: ' + e.message;
+  }
+}
+
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    document.getElementById('advInput').value = ev.target.result;
+  };
+  reader.readAsText(file, 'UTF-8');
+});
+</script>
+</body>
+</html>
