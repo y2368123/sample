@@ -179,20 +179,25 @@ function findMinWaste(pool, target, maxK = SLOT) {
   return { indices, sum: best.s, waste: best.s - target };
 }
 
-function assignRegion(pool, reqList, hourlyList) {
+function assignRegion(pool, reqList, hourlyList, maxK = SLOT) {
+  if (maxK < 1) maxK = 1;
   for (let gi = 0; gi < reqList.length; gi++) {
     const req = reqList[gi];
-    const top5Sum = pool.slice(0, SLOT).reduce((a,b) => a+b, 0);
-    if (top5Sum < req) continue;
-    const result = findMinWaste(pool, req, SLOT);
+    const topSum = pool.slice(0, maxK).reduce((a,b) => a+b, 0);
+    if (topSum < req) continue;
+    const result = findMinWaste(pool, req, maxK);
     if (result) {
       const picked = result.indices.map(i => pool[i]);
       const remaining = pool.filter((_, i) => !result.indices.includes(i));
       return { picked, grade: GRADES[gi], hourly: hourlyList[gi], req, remaining };
     }
   }
+  // 최고 등급도 달성 불가: 가장 작은 모험가 1명으로 D 등급 채우기 (req 10)
   if (pool.length > 0) {
-    return { picked: pool.slice(0, SLOT), grade: 'D', hourly: hourlyList[hourlyList.length-1], req: 10, remaining: pool.slice(SLOT) };
+    const smallestIdx = pool.length - 1;
+    const picked = [pool[smallestIdx]];
+    const remaining = pool.slice(0, smallestIdx);
+    return { picked, grade: 'D', hourly: hourlyList[hourlyList.length-1], req: 10, remaining };
   }
   return { picked: [], grade: 'none', hourly: 0, req: 0, remaining: pool };
 }
@@ -222,10 +227,15 @@ function runOptimize() {
 
     let pool = [...pool0];
     const results = {};
+    // 전체 오픈 지역 수 집계 (상위 대륙 우선 배치 시 하위 지역이 비지 않도록 예약)
+    let remainingRegions = continents.reduce((s, c) => s + c.regions, 0);
     for (const cont of continents) {
       const contRes = [];
       for (let i = 0; i < cont.regions; i++) {
-        const r = assignRegion(pool, cont.req, cont.hourly);
+        remainingRegions -= 1;
+        // 이 지역에 사용 가능한 인원 = 풀 - 이후 지역들에 최소 1명씩 예약
+        const maxK = Math.min(SLOT, pool.length - remainingRegions);
+        const r = assignRegion(pool, cont.req, cont.hourly, maxK);
         contRes.push(r);
         pool = r.remaining;
       }
