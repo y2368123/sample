@@ -69,7 +69,31 @@
     <div class="input-box">
       <h3>옵션</h3>
       <div class="options">
-        <label><input type="checkbox" id="optHeaven4"> 천계 4지역 포함 (기본 3지역)</label>
+        <label>최종 오픈 지역:
+          <select id="maxRegion" style="padding:6px;font-size:14px">
+            <option value="중앙1">중앙1</option>
+            <option value="중앙2">중앙2</option>
+            <option value="중앙3">중앙3</option>
+            <option value="중앙4">중앙4</option>
+            <option value="서부1">서부1</option>
+            <option value="서부2">서부2</option>
+            <option value="서부3">서부3</option>
+            <option value="서부4">서부4</option>
+            <option value="동부1">동부1</option>
+            <option value="동부2">동부2</option>
+            <option value="동부3">동부3</option>
+            <option value="동부4">동부4</option>
+            <option value="남부1">남부1</option>
+            <option value="남부2">남부2</option>
+            <option value="남부3">남부3</option>
+            <option value="남부4">남부4</option>
+            <option value="천계1">천계1</option>
+            <option value="천계2">천계2</option>
+            <option value="천계3" selected>천계3</option>
+            <option value="천계4">천계4</option>
+          </select>
+        </label>
+        <div style="font-size:12px;color:#666;margin-top:6px">중앙1부터 선택한 지역까지 모두 열린 것으로 계산</div>
       </div>
       <button onclick="runOptimize()">배치 계산</button>
       <div id="error" class="error"></div>
@@ -180,9 +204,21 @@ function runOptimize() {
     const pool0 = parseInput(text);
     if (pool0.length === 0) throw new Error('유효한 모험가 데이터가 없습니다.');
 
-    const heaven4 = document.getElementById('optHeaven4').checked;
-    const continents = CONTINENTS_BASE.map(c => ({ ...c }));
-    if (heaven4) continents[0].regions = 4;
+    const maxRegion = document.getElementById('maxRegion').value;
+    localStorage.setItem('tam_maxRegion', maxRegion);
+    const m = maxRegion.match(/^(.+?)(\d+)$/);
+    const maxContName = m[1];
+    const maxContNum = parseInt(m[2]);
+    // 오픈된 대륙 순서 (낮은 → 높은): 중앙 → 서부 → 동부 → 남부 → 천계
+    const openOrder = ['중앙','서부','동부','남부','천계'];
+    const maxIdx = openOrder.indexOf(maxContName);
+    const continents = CONTINENTS_BASE.map(c => {
+      const idx = openOrder.indexOf(c.name);
+      let regions = 0;
+      if (idx < maxIdx) regions = 4;
+      else if (idx === maxIdx) regions = maxContNum;
+      return { ...c, regions };
+    });
 
     let pool = [...pool0];
     const results = {};
@@ -237,6 +273,18 @@ document.getElementById('fileInput').addEventListener('change', function(e) {
   };
   reader.readAsText(file, 'UTF-8');
 });
+
+// 로컬스토리지에서 최종 오픈 지역 복원
+(function(){
+  const saved = localStorage.getItem('tam_maxRegion');
+  if (saved) {
+    const sel = document.getElementById('maxRegion');
+    if ([...sel.options].some(o => o.value === saved)) sel.value = saved;
+  }
+  document.getElementById('maxRegion').addEventListener('change', function(){
+    localStorage.setItem('tam_maxRegion', this.value);
+  });
+})();
 </script>
 </body>
 </html>
