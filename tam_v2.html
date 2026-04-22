@@ -112,6 +112,15 @@ th { background: #4a90e2; color: white; }
 button.calc-btn { background: #27ae60; color: white; padding: 10px 28px; border: none; border-radius: 4px; cursor: pointer; font-size: 15px; margin-top: 4px; }
 button.calc-btn:hover { background: #1e8449; }
 
+/* 급별 인원 배지 */
+.grade-badge {
+  font-size: 12px; font-weight: bold; padding: 2px 8px;
+  border-radius: 10px; background: #eee; color: #666;
+  white-space: nowrap; flex-shrink: 0;
+}
+.grade-badge.ok  { background: #d4edda; color: #1a6e30; }
+.grade-badge.bad { background: #fde8e8; color: #c0392b; }
+
 /* 결과 테이블 스크롤 */
 #resultArea { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
@@ -218,13 +227,13 @@ button.calc-btn:hover { background: #1e8449; }
 <script>
 // ── 급별 포인트 범위 정의 ──────────────────────────────
 const GRADE_DEF = [
-  { grade: 1, start: 10,  step: 2,  max: 26   },
-  { grade: 2, start: 30,  step: 6,  max: 78   },
-  { grade: 3, start: 50,  step: 10, max: 130  },
-  { grade: 4, start: 70,  step: 14, max: 322  },
-  { grade: 5, start: 100, step: 20, max: 460  },
-  { grade: 6, start: 150, step: 30, max: 1260 },
-  { grade: 7, start: 200, step: 40, max: 1600 },
+  { grade: 1, start: 10,  step: 2,  max: 26,   maxCount: 12 },
+  { grade: 2, start: 30,  step: 6,  max: 78,   maxCount: 12 },
+  { grade: 3, start: 50,  step: 10, max: 130,  maxCount: 12 },
+  { grade: 4, start: 70,  step: 14, max: 322,  maxCount: 12 },
+  { grade: 5, start: 100, step: 20, max: 460,  maxCount: 12 },
+  { grade: 6, start: 150, step: 30, max: 1260, maxCount: 5  },
+  { grade: 7, start: 200, step: 40, max: 1600, maxCount: 10 },
 ];
 
 // state: { [grade]: { [point]: count } }
@@ -251,6 +260,12 @@ function buildUI() {
     label.className = 'grade-label';
     label.textContent = `${d.grade}급`;
     row.appendChild(label);
+
+    const badge = document.createElement('span');
+    badge.className = 'grade-badge';
+    badge.id = `badge-${d.grade}`;
+    badge.textContent = `0 / ${d.maxCount}`;
+    row.appendChild(badge);
 
     // ADD 버튼
     const addWrap = document.createElement('div');
@@ -302,9 +317,22 @@ function closeModal() {
   document.getElementById('modal-overlay').classList.remove('open');
 }
 
+function getGradeTotal(grade) {
+  return Object.values(state[grade]).reduce((s, c) => s + c, 0);
+}
+
+function renderGradeBadge(grade) {
+  const d = GRADE_DEF[grade - 1];
+  const total = getGradeTotal(grade);
+  const badge = document.getElementById(`badge-${grade}`);
+  badge.textContent = `${total} / ${d.maxCount}`;
+  badge.className = 'grade-badge' + (total === 0 ? '' : total === d.maxCount ? ' ok' : ' bad');
+}
+
 function selectPoint(grade, point) {
   state[grade][point] = 1;
   renderChips(grade);
+  renderGradeBadge(grade);
   renderSummary();
   saveState();
 }
@@ -329,7 +357,7 @@ function renderChips(grade) {
 
     const minusBtn = document.createElement('button');
     minusBtn.textContent = '−';
-    minusBtn.onclick = () => { if (sel[p] > 1) { sel[p]--; renderChips(grade); renderSummary(); saveState(); } };
+    minusBtn.onclick = () => { if (sel[p] > 1) { sel[p]--; renderChips(grade); renderGradeBadge(grade); renderSummary(); saveState(); } };
     counter.appendChild(minusBtn);
 
     const cnt = document.createElement('span');
@@ -339,7 +367,7 @@ function renderChips(grade) {
 
     const plusBtn = document.createElement('button');
     plusBtn.textContent = '+';
-    plusBtn.onclick = () => { sel[p]++; renderChips(grade); renderSummary(); saveState(); };
+    plusBtn.onclick = () => { sel[p]++; renderChips(grade); renderGradeBadge(grade); renderSummary(); saveState(); };
     counter.appendChild(plusBtn);
 
     chip.appendChild(counter);
@@ -347,7 +375,7 @@ function renderChips(grade) {
     const removeBtn = document.createElement('button');
     removeBtn.className = 'chip-remove';
     removeBtn.textContent = '✕';
-    removeBtn.onclick = () => { delete sel[p]; renderChips(grade); renderSummary(); saveState(); };
+    removeBtn.onclick = () => { delete sel[p]; renderChips(grade); renderGradeBadge(grade); renderSummary(); saveState(); };
     chip.appendChild(removeBtn);
 
     container.appendChild(chip);
@@ -392,7 +420,7 @@ function loadState() {
         });
       }
     });
-    GRADE_DEF.forEach(d => renderChips(d.grade));
+    GRADE_DEF.forEach(d => { renderChips(d.grade); renderGradeBadge(d.grade); });
     renderSummary();
   } catch(e) {}
 }
