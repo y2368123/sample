@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>탐험 지역 모험가 배치 최적화 v2</title>
+<style>
+* { box-sizing: border-box; }
+body { font-family: "Malgun Gothic", sans-serif; margin: 20px; background: #f0f2f5; }
+h1 { color: #333; margin-bottom: 4px; }
+h2 { font-size: 16px; color: #555; margin: 0 0 12px; }
+.container { max-width: 1200px; margin: auto; }
+.card { background: white; padding: 18px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,.1); margin-bottom: 16px; }
+
+/* 급별 행 */
+.grade-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid #f0f0f0; flex-wrap: wrap; min-height: 52px; }
+.grade-row:last-child { border-bottom: none; }
+.grade-label { font-weight: bold; min-width: 36px; font-size: 14px; color: #444; flex-shrink: 0; }
+
+/* ADD 버튼 */
+.add-btn button {
+  background: #4a90e2; color: white; border: none; border-radius: 6px;
+  padding: 0 14px; cursor: pointer; font-size: 13px; font-weight: bold;
+  height: 36px; display: flex; align-items: center; gap: 4px; white-space: nowrap;
+}
+.add-btn button:hover { background: #357abd; }
+
+/* 모달 오버레이 */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.55); z-index: 2000;
+  align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: white; border-radius: 12px; padding: 24px;
+  max-width: 500px; width: 92%; box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+}
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;
+}
+.modal-title { font-size: 16px; font-weight: bold; color: #222; }
+.modal-close {
+  background: none; border: none; cursor: pointer; font-size: 20px;
+  color: #888; line-height: 1; padding: 2px 6px; border-radius: 4px;
+}
+.modal-close:hover { background: #f0f0f0; color: #333; }
+.modal-pts { display: flex; flex-wrap: wrap; gap: 8px; }
+.modal-pt {
+  padding: 9px 16px; background: #f0f7ff; border: 1.5px solid #b0d0f0;
+  border-radius: 8px; cursor: pointer; font-size: 15px; font-weight: bold;
+  color: #1a4fa0; transition: background .12s, border-color .12s;
+}
+.modal-pt:hover { background: #d0e8ff; border-color: #4a90e2; }
+.modal-empty { font-size: 13px; color: #aaa; padding: 8px 0; }
+
+/* 선택된 모험가 칩 */
+.adv-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip {
+  display: flex; align-items: center; height: 36px;
+  background: white; border: 1.5px solid #b0d0f0; border-radius: 8px;
+  overflow: hidden; font-size: 13px; flex-shrink: 0;
+}
+.chip-pt {
+  background: #2a6dd9; color: white; font-weight: bold; font-size: 13px;
+  padding: 0 10px; height: 100%; display: flex; align-items: center;
+  white-space: nowrap; min-width: 48px; justify-content: center;
+}
+.chip-counter {
+  display: flex; align-items: center; border-left: 1.5px solid #b0d0f0;
+  border-right: 1.5px solid #b0d0f0; height: 100%;
+}
+.chip-counter button {
+  background: #f5f7fa; border: none; cursor: pointer; color: #444;
+  font-size: 16px; width: 28px; height: 100%; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+}
+.chip-counter button:hover { background: #e0e8f5; color: #1a4fa0; }
+.chip-cnt { min-width: 28px; text-align: center; font-weight: bold; color: #222; font-size: 14px; }
+.chip-remove {
+  background: none; border: none; cursor: pointer; color: #cc2222;
+  font-size: 15px; width: 30px; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+}
+.chip-remove:hover { background: #ffe8e8; }
+
+/* 요약 */
+.summary-box { background: #f8fff8; border-left: 4px solid #4c4; padding: 10px 14px; border-radius: 4px; }
+.summary-pts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.summary-pt { background: #e8f5e8; border: 1px solid #aaddaa; border-radius: 3px; padding: 2px 8px; font-size: 13px; }
+
+/* 옵션 */
+.options-row { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+
+/* 결과 */
+table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+th, td { border: 1px solid #ddd; padding: 7px; text-align: center; font-size: 14px; }
+th { background: #4a90e2; color: white; }
+.grade-UUR { background: #ffcccc !important; font-weight: bold; }
+.grade-UR  { background: #ffddcc !important; font-weight: bold; }
+.grade-U   { background: #ffeecc !important; }
+.grade-SSS { background: #ffffcc !important; }
+.grade-SS  { background: #eeffcc !important; }
+.grade-S   { background: #ddffcc !important; }
+.grade-A   { background: #ccffdd !important; }
+.grade-B   { background: #ccffff !important; }
+.grade-C   { background: #ccddff !important; }
+.grade-D   { background: #ddccff !important; }
+.result-summary { margin-top: 10px; padding: 12px; background: #e8f8e8; border-left: 4px solid #4c4; font-size: 15px; }
+.error { color: red; margin-top: 8px; }
+
+button.calc-btn { background: #27ae60; color: white; padding: 10px 28px; border: none; border-radius: 4px; cursor: pointer; font-size: 15px; margin-top: 4px; }
+button.calc-btn:hover { background: #1e8449; }
+
+/* 결과 테이블 스크롤 */
+#resultArea { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* 모바일 */
+@media (max-width: 640px) {
+  body { margin: 10px 8px; }
+  h1 { font-size: 18px; }
+  h2 { font-size: 14px; margin-bottom: 8px; }
+  .card { padding: 14px 12px; border-radius: 6px; margin-bottom: 10px; }
+
+  .grade-row { gap: 6px; padding: 6px 0; min-height: 44px; }
+  .grade-label { font-size: 13px; min-width: 30px; }
+
+  /* 칩 터치 타겟 확대 */
+  .chip { height: 40px; }
+  .chip-pt { font-size: 13px; padding: 0 9px; min-width: 44px; }
+  .chip-counter button { width: 32px; font-size: 18px; }
+  .chip-cnt { min-width: 26px; font-size: 14px; }
+  .chip-remove { width: 34px; font-size: 17px; }
+
+  /* ADD 버튼 터치 타겟 */
+  .add-btn button { height: 40px; padding: 0 12px; font-size: 13px; }
+
+  /* 모달 하단 시트 스타일 */
+  .modal-overlay { align-items: flex-end; }
+  .modal-box {
+    width: 100%; max-width: 100%; border-radius: 16px 16px 0 0;
+    padding: 20px 16px 32px; max-height: 70vh; overflow-y: auto;
+  }
+  .modal-pt { padding: 11px 14px; font-size: 16px; }
+
+  /* 지역 설정 카드 */
+  .options-row { flex-direction: column; align-items: stretch; gap: 10px; }
+  .options-row label { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+  .options-row label select { width: 100%; padding: 8px; font-size: 15px; margin-left: 0; }
+  .options-row span { font-size: 11px; }
+  button.calc-btn { width: 100%; padding: 12px; font-size: 15px; }
+
+  /* 결과 테이블 */
+  table { font-size: 12px; }
+  th, td { padding: 5px 4px; }
+  .result-summary { font-size: 13px; }
+  .result-summary b[style] { font-size: 17px !important; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>탐험 지역 모험가 배치 최적화 v2</h1>
+
+  <!-- 모험가 구성 -->
+  <div class="card">
+    <h2>모험가 구성</h2>
+    <div id="gradeRows"></div>
+    <div class="summary-box" style="margin-top:12px">
+      <div id="summaryText" style="font-weight:bold;font-size:15px">선택한 모험가: 0명</div>
+      <div class="summary-pts" id="summaryPts"></div>
+    </div>
+  </div>
+
+  <!-- 옵션 + 계산 -->
+  <div class="card">
+    <h2>탐험 지역 설정</h2>
+    <div class="options-row">
+      <label>최종 오픈 지역:
+        <select id="maxRegion" style="padding:6px;font-size:14px;margin-left:6px">
+          <option value="중앙1">중앙1</option><option value="중앙2">중앙2</option>
+          <option value="중앙3">중앙3</option><option value="중앙4">중앙4</option>
+          <option value="서부1">서부1</option><option value="서부2">서부2</option>
+          <option value="서부3">서부3</option><option value="서부4">서부4</option>
+          <option value="동부1">동부1</option><option value="동부2">동부2</option>
+          <option value="동부3">동부3</option><option value="동부4">동부4</option>
+          <option value="남부1">남부1</option><option value="남부2">남부2</option>
+          <option value="남부3">남부3</option><option value="남부4">남부4</option>
+          <option value="천계1">천계1</option><option value="천계2">천계2</option>
+          <option value="천계3" selected>천계3</option><option value="천계4">천계4</option>
+        </select>
+      </label>
+      <span style="font-size:12px;color:#888">중앙1부터 선택한 지역까지 열린 것으로 계산</span>
+      <button class="calc-btn" onclick="runOptimize()">배치 계산</button>
+    </div>
+    <div id="error" class="error"></div>
+  </div>
+
+  <!-- 결과 -->
+  <div class="card" id="resultCard" style="display:none">
+    <h2>배치 결과</h2>
+    <div id="resultSummary" class="result-summary"></div>
+    <div id="resultArea"></div>
+  </div>
+</div>
+
+<!-- 포인트 선택 모달 -->
+<div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title"></span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-pts" id="modal-pts"></div>
+  </div>
+</div>
+
+<script>
+// ── 급별 포인트 범위 정의 ──────────────────────────────
+const GRADE_DEF = [
+  { grade: 1, start: 10,  step: 2,  max: 26   },
+  { grade: 2, start: 30,  step: 6,  max: 78   },
+  { grade: 3, start: 50,  step: 10, max: 130  },
+  { grade: 4, start: 70,  step: 14, max: 322  },
+  { grade: 5, start: 100, step: 20, max: 460  },
+  { grade: 6, start: 150, step: 30, max: 1260 },
+  { grade: 7, start: 200, step: 40, max: 1600 },
+];
+
+// state: { [grade]: { [point]: count } }
+let state = {};
+GRADE_DEF.forEach(d => state[d.grade] = {});
+
+// ── 포인트 목록 생성 ──────────────────────────────────
+function getPoints(d) {
+  const pts = [];
+  for (let p = d.start; p <= d.max; p += d.step) pts.push(p);
+  return pts;
+}
+
+// ── UI 초기화 ─────────────────────────────────────────
+function buildUI() {
+  const container = document.getElementById('gradeRows');
+  container.innerHTML = '';
+  GRADE_DEF.forEach(d => {
+    const row = document.createElement('div');
+    row.className = 'grade-row';
+    row.id = `row-${d.grade}`;
+
+    const label = document.createElement('span');
+    label.className = 'grade-label';
+    label.textContent = `${d.grade}급`;
+    row.appendChild(label);
+
+    // ADD 버튼
+    const addWrap = document.createElement('div');
+    addWrap.className = 'add-btn';
+
+    const addBtn = document.createElement('button');
+    addBtn.innerHTML = '<span style="font-size:16px;line-height:1">＋</span> ADD';
+    addBtn.onclick = () => openModal(d.grade);
+    addWrap.appendChild(addBtn);
+    row.appendChild(addWrap);
+
+    // 칩 영역
+    const chips = document.createElement('div');
+    chips.className = 'adv-chips';
+    chips.id = `chips-${d.grade}`;
+    row.appendChild(chips);
+
+    container.appendChild(row);
+  });
+
+}
+
+function openModal(grade) {
+  const overlay = document.getElementById('modal-overlay');
+  const title = document.getElementById('modal-title');
+  const ptsEl = document.getElementById('modal-pts');
+  const d = GRADE_DEF[grade - 1];
+  const pts = getPoints(d);
+  const selected = state[grade];
+  const available = pts.filter(p => selected[p] === undefined);
+
+  title.textContent = `${grade}급 모험가 포인트 선택`;
+  ptsEl.innerHTML = '';
+  if (available.length === 0) {
+    ptsEl.innerHTML = '<span class="modal-empty">모두 선택됨</span>';
+  } else {
+    available.forEach(p => {
+      const btn = document.createElement('button');
+      btn.className = 'modal-pt';
+      btn.textContent = `${p}pt`;
+      btn.onclick = () => { selectPoint(grade, p); closeModal(); };
+      ptsEl.appendChild(btn);
+    });
+  }
+  overlay.classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+function selectPoint(grade, point) {
+  state[grade][point] = 1;
+  renderChips(grade);
+  renderSummary();
+  saveState();
+}
+
+function renderChips(grade) {
+  const container = document.getElementById(`chips-${grade}`);
+  container.innerHTML = '';
+  const sel = state[grade];
+  const d = GRADE_DEF[grade - 1];
+  getPoints(d).forEach(p => {
+    if (sel[p] === undefined) return;
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+
+    const ptLabel = document.createElement('span');
+    ptLabel.className = 'chip-pt';
+    ptLabel.textContent = `${p}pt`;
+    chip.appendChild(ptLabel);
+
+    const counter = document.createElement('div');
+    counter.className = 'chip-counter';
+
+    const minusBtn = document.createElement('button');
+    minusBtn.textContent = '−';
+    minusBtn.onclick = () => { if (sel[p] > 1) { sel[p]--; renderChips(grade); renderSummary(); saveState(); } };
+    counter.appendChild(minusBtn);
+
+    const cnt = document.createElement('span');
+    cnt.className = 'chip-cnt';
+    cnt.textContent = sel[p];
+    counter.appendChild(cnt);
+
+    const plusBtn = document.createElement('button');
+    plusBtn.textContent = '+';
+    plusBtn.onclick = () => { sel[p]++; renderChips(grade); renderSummary(); saveState(); };
+    counter.appendChild(plusBtn);
+
+    chip.appendChild(counter);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'chip-remove';
+    removeBtn.textContent = '✕';
+    removeBtn.onclick = () => { delete sel[p]; renderChips(grade); renderSummary(); saveState(); };
+    chip.appendChild(removeBtn);
+
+    container.appendChild(chip);
+  });
+}
+
+function renderSummary() {
+  let total = 0;
+  const ptMap = {};
+  GRADE_DEF.forEach(d => {
+    Object.entries(state[d.grade]).forEach(([p, c]) => {
+      total += c;
+      ptMap[p] = (ptMap[p] || 0) + c;
+    });
+  });
+  document.getElementById('summaryText').textContent = `선택한 모험가: ${total}명`;
+  const ptsEl = document.getElementById('summaryPts');
+  ptsEl.innerHTML = '';
+  Object.entries(ptMap).sort((a,b) => +a[0] - +b[0]).forEach(([p, c]) => {
+    const el = document.createElement('span');
+    el.className = 'summary-pt';
+    el.textContent = `${p}pt × ${c}명`;
+    ptsEl.appendChild(el);
+  });
+}
+
+// ── 상태 저장/복원 ────────────────────────────────────
+function saveState() {
+  localStorage.setItem('tam_v2_state', JSON.stringify(state));
+}
+
+function loadState() {
+  const raw = localStorage.getItem('tam_v2_state');
+  if (!raw) return;
+  try {
+    const loaded = JSON.parse(raw);
+    GRADE_DEF.forEach(d => {
+      if (loaded[d.grade]) {
+        state[d.grade] = {};
+        Object.entries(loaded[d.grade]).forEach(([p, c]) => {
+          state[d.grade][+p] = c;
+        });
+      }
+    });
+    GRADE_DEF.forEach(d => renderChips(d.grade));
+    renderSummary();
+  } catch(e) {}
+}
+
+// ── 배치 계산 (tam.html 로직 동일) ───────────────────
+const CONTINENTS_BASE = [
+  { name:'천계', req:[3000,2500,2100,1800,1500,1200,900,600,300,10],  regions:3, hourly:[9500,9000,8500,8000,7500,7000,6500,6000,5500,5000] },
+  { name:'남부', req:[800,700,600,550,440,340,240,160,80,10],          regions:4, hourly:[5690,5360,5030,4700,4370,4030,3700,3360,2690,2016] },
+  { name:'동부', req:[700,600,500,450,340,260,180,120,60,10],          regions:4, hourly:[6080,5400,4720,4040,3740,3460,3160,2880,2300,1728] },
+  { name:'서부', req:[600,500,400,350,270,210,150,100,50,10],          regions:4, hourly:[5070,4500,3930,3360,3120,2880,2640,2400,1920,1440] },
+  { name:'중앙', req:[500,400,300,250,190,140,90,60,30,10],            regions:4, hourly:[4140,3660,3180,2700,2520,2280,2100,1920,1560,1152] },
+];
+const GRADES = ['UUR','UR','U','SSS','SS','S','A','B','C','D'];
+const SLOT = 5;
+
+function buildPool() {
+  const pool = [];
+  GRADE_DEF.forEach(d => {
+    Object.entries(state[d.grade]).forEach(([p, c]) => {
+      for (let i = 0; i < c; i++) pool.push(+p);
+    });
+  });
+  pool.sort((a,b) => b-a);
+  return pool;
+}
+
+function findMinWaste(pool, target, maxK) {
+  if (maxK < 1) return null;
+  const reachable = new Map();
+  reachable.set('0,0', null);
+  const maxSum = target + 5000;
+  for (let i = 0; i < pool.length; i++) {
+    const p = pool[i];
+    const newE = [];
+    for (const [key] of reachable) {
+      const [j, s] = key.split(',').map(Number);
+      if (j >= maxK) continue;
+      const ns = s + p;
+      if (ns > maxSum) continue;
+      const nk = `${j+1},${ns}`;
+      if (!reachable.has(nk) && !newE.some(e => e[0] === nk)) newE.push([nk, [j, s, i]]);
+    }
+    newE.forEach(([k, v]) => reachable.set(k, v));
+  }
+  let best = null;
+  for (const [key] of reachable) {
+    const [j, s] = key.split(',').map(Number);
+    if (j > 0 && s >= target) {
+      if (!best || s < best.s || (s === best.s && j < best.j)) best = { j, s, key };
+    }
+  }
+  if (!best) return null;
+  const indices = [];
+  let cur = best.key;
+  while (cur !== '0,0') {
+    const v = reachable.get(cur);
+    if (!v) break;
+    const [pj, ps, idx] = v;
+    indices.push(idx);
+    cur = `${pj},${ps}`;
+  }
+  indices.sort((a,b) => a-b);
+  return { indices, sum: best.s, waste: best.s - target };
+}
+
+function assignRegion(pool, reqList, hourlyList, maxK = SLOT) {
+  if (maxK < 1) maxK = 1;
+  for (let gi = 0; gi < reqList.length; gi++) {
+    const req = reqList[gi];
+    if (pool.slice(0, maxK).reduce((a,b) => a+b, 0) < req) continue;
+    const result = findMinWaste(pool, req, maxK);
+    if (result) {
+      const picked = result.indices.map(i => pool[i]);
+      const remaining = pool.filter((_, i) => !result.indices.includes(i));
+      return { picked, grade: GRADES[gi], hourly: hourlyList[gi], req, remaining };
+    }
+  }
+  if (pool.length > 0) {
+    const picked = [pool[pool.length - 1]];
+    return { picked, grade: 'D', hourly: hourlyList[hourlyList.length-1], req: 10, remaining: pool.slice(0, -1) };
+  }
+  return { picked: [], grade: 'none', hourly: 0, req: 0, remaining: pool };
+}
+
+function runOptimize() {
+  document.getElementById('error').textContent = '';
+  try {
+    const pool0 = buildPool();
+    if (pool0.length === 0) throw new Error('모험가를 1명 이상 선택해주세요.');
+
+    const maxRegion = document.getElementById('maxRegion').value;
+    localStorage.setItem('tam_maxRegion', maxRegion);
+
+    const m = maxRegion.match(/^(.+?)(\d+)$/);
+    const maxContName = m[1], maxContNum = parseInt(m[2]);
+    const openOrder = ['중앙','서부','동부','남부','천계'];
+    const maxIdx = openOrder.indexOf(maxContName);
+
+    const continents = CONTINENTS_BASE.map(c => {
+      const idx = openOrder.indexOf(c.name);
+      let regions = 0;
+      if (idx < maxIdx) regions = 4;
+      else if (idx === maxIdx) regions = maxContNum;
+      return { ...c, regions };
+    });
+
+    let pool = [...pool0];
+    const results = {};
+    let remainingRegions = continents.reduce((s,c) => s + c.regions, 0);
+
+    for (const cont of continents) {
+      const contRes = [];
+      for (let i = 0; i < cont.regions; i++) {
+        remainingRegions--;
+        const maxK = Math.min(SLOT, pool.length - remainingRegions);
+        const r = assignRegion(pool, cont.req, cont.hourly, maxK);
+        contRes.push(r);
+        pool = r.remaining;
+      }
+      results[cont.name] = contRes;
+    }
+
+    const printOrder = ['중앙','서부','동부','남부','천계'];
+    let html = '<table><thead><tr><th>지역</th><th>배치 모험가 포인트</th><th>인원</th><th>합계</th><th>낭비</th><th>등급</th><th>시간당 금화</th></tr></thead><tbody>';
+    let totalHourly = 0, totalWaste = 0;
+
+    for (const name of printOrder) {
+      const res = results[name];
+      if (!res || !res.length) continue;
+      [...res].reverse().forEach((r, i) => {
+        const sum = r.picked.reduce((a,b) => a+b, 0);
+        const waste = sum > 0 ? sum - r.req : 0;
+        totalHourly += r.hourly;
+        totalWaste += waste;
+        html += `<tr class="grade-${r.grade}"><td>${name}${i+1}</td><td>${r.picked.join(', ') || '-'}</td><td>${r.picked.length}</td><td>${sum}</td><td>${waste}</td><td>${r.grade}</td><td>${r.hourly.toLocaleString()}</td></tr>`;
+      });
+    }
+    html += '</tbody></table>';
+
+    document.getElementById('resultCard').style.display = 'block';
+    document.getElementById('resultArea').innerHTML = html;
+    document.getElementById('resultSummary').innerHTML =
+      `총 모험가: <b>${pool0.length}명</b> &nbsp;·&nbsp; 총 포인트: <b>${pool0.reduce((a,b)=>a+b,0).toLocaleString()}</b> &nbsp;·&nbsp; 남은 모험가: <b>${pool.length}명</b> &nbsp;·&nbsp; 총 낭비: <b>${totalWaste}pt</b><br>
+       총 시간당 금화: <b style="font-size:20px;color:#c40">${totalHourly.toLocaleString()}</b>`;
+    document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth' });
+  } catch(e) {
+    document.getElementById('error').textContent = '에러: ' + e.message;
+  }
+}
+
+// ── 초기화 ────────────────────────────────────────────
+buildUI();
+loadState();
+
+const savedRegion = localStorage.getItem('tam_maxRegion');
+if (savedRegion) {
+  const sel = document.getElementById('maxRegion');
+  if ([...sel.options].some(o => o.value === savedRegion)) sel.value = savedRegion;
+}
+document.getElementById('maxRegion').addEventListener('change', function() {
+  localStorage.setItem('tam_maxRegion', this.value);
+});
+</script>
+</body>
+</html>
