@@ -507,6 +507,26 @@ function assignRegion(pool, reqList, hourlyList, maxK = SLOT) {
   return { picked: [], grade: 'none', hourly: 0, req: 0, remaining: pool };
 }
 
+function doOptimize(pool0, continents, finalContName, finalSlot) {
+  let pool = [...pool0];
+  const results = {};
+  let remainingRegions = continents.reduce((s,c) => s + c.regions, 0);
+  for (const cont of continents) {
+    const contRes = [];
+    const isFinalCont = cont.name === finalContName;
+    for (let i = 0; i < cont.regions; i++) {
+      remainingRegions--;
+      const effectiveSlot = (isFinalCont && i === 0) ? finalSlot : SLOT;
+      const maxK = Math.min(effectiveSlot, pool.length - remainingRegions);
+      const r = assignRegion(pool, cont.req, cont.hourly, maxK);
+      contRes.push(r);
+      pool = r.remaining;
+    }
+    results[cont.name] = contRes;
+  }
+  return { results, pool };
+}
+
 function runOptimize() {
   document.getElementById('error').textContent = '';
   try {
@@ -530,23 +550,22 @@ function runOptimize() {
       return { ...c, regions };
     });
 
-    let pool = [...pool0];
-    const results = {};
-    let remainingRegions = continents.reduce((s,c) => s + c.regions, 0);
+    let { results, pool } = doOptimize(pool0, continents, maxContName, finalRegionSlot);
 
-    for (const cont of continents) {
-      const contRes = [];
-      const isFinalCont = cont.name === maxContName;
-      for (let i = 0; i < cont.regions; i++) {
-        remainingRegions--;
-        // i=0 within the final continent maps to the highest sub-region (e.g. 천계4) after display reversal
-        const effectiveSlot = (isFinalCont && i === 0) ? finalRegionSlot : SLOT;
-        const maxK = Math.min(effectiveSlot, pool.length - remainingRegions);
-        const r = assignRegion(pool, cont.req, cont.hourly, maxK);
-        contRes.push(r);
-        pool = r.remaining;
+    // 천계4 슬롯4개 선택 시, 천계4가 UUR 달성 불가면 천계3(슬롯5개)으로 자동 전환
+    // 천계는 모든 서브지역 보상이 동일하므로 슬롯이 많은 쪽이 유리
+    let usedFallback = false;
+    if (maxContName === '천계' && maxContNum === 4 && finalRegionSlot < SLOT) {
+      const chunkyRes = results['천계'];
+      if (chunkyRes && chunkyRes[0] && chunkyRes[0].grade !== 'UUR') {
+        const continentsFallback = continents.map(c =>
+          c.name === '천계' ? { ...c, regions: 3 } : c
+        );
+        const fallback = doOptimize(pool0, continentsFallback, '천계', SLOT);
+        results = fallback.results;
+        pool = fallback.pool;
+        usedFallback = true;
       }
-      results[cont.name] = contRes;
     }
 
     const printOrder = ['중앙','서부','동부','남부','천계'];
@@ -566,11 +585,15 @@ function runOptimize() {
     }
     html += '</tbody></table>';
 
+    const fallbackNote = usedFallback
+      ? `<br><span style="color:#e67e00;font-size:13px">⚠ 천계4(슬롯4개)로 UUR 달성 불가 → 천계3(슬롯5개)으로 자동 전환</span>`
+      : '';
+
     document.getElementById('resultCard').style.display = 'block';
     document.getElementById('resultArea').innerHTML = html;
     document.getElementById('resultSummary').innerHTML =
       `총 모험가: <b>${pool0.length}명</b> &nbsp;·&nbsp; 총 포인트: <b>${pool0.reduce((a,b)=>a+b,0).toLocaleString()}</b> &nbsp;·&nbsp; 남은 모험가: <b>${pool.length}명</b> &nbsp;·&nbsp; 총 낭비: <b>${totalWaste}pt</b><br>
-       총 시간당 금화: <b style="font-size:20px;color:#c40">${totalHourly.toLocaleString()}</b>`;
+       총 시간당 금화: <b style="font-size:20px;color:#c40">${totalHourly.toLocaleString()}</b>${fallbackNote}`;
     document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth' });
   } catch(e) {
     document.getElementById('error').textContent = '에러: ' + e.message;
