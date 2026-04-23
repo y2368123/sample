@@ -121,6 +121,15 @@ button.calc-btn:hover { background: #1e8449; }
 .grade-badge.ok  { background: #d4edda; color: #1a6e30; }
 .grade-badge.bad { background: #fde8e8; color: #c0392b; }
 
+/* export/import */
+.io-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; padding-top: 12px; border-top: 1px solid #eee; }
+.io-btn { padding: 7px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; }
+.io-btn.export { background: #6c5ce7; color: white; }
+.io-btn.export:hover { background: #5a4bd1; }
+.io-btn.import { background: #00b894; color: white; }
+.io-btn.import:hover { background: #00a381; }
+.io-msg { font-size: 12px; color: #27ae60; }
+
 /* 결과 테이블 스크롤 */
 #resultArea { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
@@ -178,6 +187,14 @@ button.calc-btn:hover { background: #1e8449; }
     <div class="summary-box" style="margin-top:12px">
       <div id="summaryText" style="font-weight:bold;font-size:15px">선택한 모험가: 0명</div>
       <div class="summary-pts" id="summaryPts"></div>
+    </div>
+    <div class="io-row">
+      <button class="io-btn export" onclick="exportData()">⬇ 내보내기 (JSON)</button>
+      <label class="io-btn import" style="cursor:pointer">
+        ⬆ 가져오기 (JSON)
+        <input type="file" accept=".json" style="display:none" onchange="importData(event)">
+      </label>
+      <span class="io-msg" id="ioMsg"></span>
     </div>
   </div>
 
@@ -603,6 +620,59 @@ function runOptimize() {
   } catch(e) {
     document.getElementById('error').textContent = '에러: ' + e.message;
   }
+}
+
+// ── 데이터 내보내기 / 가져오기 ───────────────────────
+function exportData() {
+  const data = {
+    state: state,
+    maxRegion: document.getElementById('maxRegion').value,
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `tam_v2_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.state) throw new Error('올바른 형식이 아닙니다.');
+      GRADE_DEF.forEach(d => {
+        state[d.grade] = {};
+        if (data.state[d.grade]) {
+          Object.entries(data.state[d.grade]).forEach(([p, c]) => {
+            state[d.grade][+p] = c;
+          });
+        }
+        renderChips(d.grade);
+        renderGradeBadge(d.grade);
+      });
+      renderSummary();
+      saveState();
+      if (data.maxRegion) {
+        const sel = document.getElementById('maxRegion');
+        if ([...sel.options].some(o => o.value === data.maxRegion)) {
+          sel.value = data.maxRegion;
+          localStorage.setItem('tam_maxRegion', data.maxRegion);
+        }
+      }
+      const msg = document.getElementById('ioMsg');
+      msg.textContent = '가져오기 완료!';
+      setTimeout(() => { msg.textContent = ''; }, 3000);
+    } catch(err) {
+      alert('가져오기 실패: ' + err.message);
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
 }
 
 // ── 초기화 ────────────────────────────────────────────
