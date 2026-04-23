@@ -196,7 +196,9 @@ button.calc-btn:hover { background: #1e8449; }
           <option value="남부1">남부1</option><option value="남부2">남부2</option>
           <option value="남부3">남부3</option><option value="남부4">남부4</option>
           <option value="천계1">천계1</option><option value="천계2">천계2</option>
-          <option value="천계3" selected>천계3</option><option value="천계4">천계4</option>
+          <option value="천계3" selected>천계3</option>
+          <option value="천계4-4">천계4 - 슬롯 4개</option>
+          <option value="천계4-5">천계4 - 슬롯 5개</option>
         </select>
       </label>
       <span style="font-size:12px;color:#888">중앙1부터 선택한 지역까지 열린 것으로 계산</span>
@@ -514,8 +516,9 @@ function runOptimize() {
     const maxRegion = document.getElementById('maxRegion').value;
     localStorage.setItem('tam_maxRegion', maxRegion);
 
-    const m = maxRegion.match(/^(.+?)(\d+)$/);
+    const m = maxRegion.match(/^(.+?)(\d+)(?:-(\d+))?$/);
     const maxContName = m[1], maxContNum = parseInt(m[2]);
+    const finalRegionSlot = m[3] ? parseInt(m[3]) : SLOT;
     const openOrder = ['중앙','서부','동부','남부','천계'];
     const maxIdx = openOrder.indexOf(maxContName);
 
@@ -533,9 +536,12 @@ function runOptimize() {
 
     for (const cont of continents) {
       const contRes = [];
+      const isFinalCont = cont.name === maxContName;
       for (let i = 0; i < cont.regions; i++) {
         remainingRegions--;
-        const maxK = Math.min(SLOT, pool.length - remainingRegions);
+        // i=0 within the final continent maps to the highest sub-region (e.g. 천계4) after display reversal
+        const effectiveSlot = (isFinalCont && i === 0) ? finalRegionSlot : SLOT;
+        const maxK = Math.min(effectiveSlot, pool.length - remainingRegions);
         const r = assignRegion(pool, cont.req, cont.hourly, maxK);
         contRes.push(r);
         pool = r.remaining;
