@@ -574,22 +574,6 @@ function runOptimize() {
 
     let { results, pool } = doOptimize(pool0, continents, maxContName, finalRegionSlot);
 
-    // 천계4 슬롯4개 선택 시, 천계4가 UUR 달성 불가면 천계3(슬롯5개)으로 자동 전환
-    // 천계는 모든 서브지역 보상이 동일하므로 슬롯이 많은 쪽이 유리
-    let usedFallback = false;
-    if (maxContName === '천계' && maxContNum === 4 && finalRegionSlot < SLOT) {
-      const chunkyRes = results['천계'];
-      if (chunkyRes && chunkyRes[0] && chunkyRes[0].grade !== 'UUR') {
-        const continentsFallback = continents.map(c =>
-          c.name === '천계' ? { ...c, regions: 3 } : c
-        );
-        const fallback = doOptimize(pool0, continentsFallback, '천계', SLOT);
-        results = fallback.results;
-        pool = fallback.pool;
-        usedFallback = true;
-      }
-    }
-
     const printOrder = ['중앙','서부','동부','남부','천계'];
     let html = '<table><thead><tr><th>지역</th><th>배치 모험가 포인트</th><th>인원</th><th>합계</th><th>낭비</th><th>등급</th><th>시간당 금화</th></tr></thead><tbody>';
     let totalHourly = 0, totalWaste = 0;
@@ -607,15 +591,11 @@ function runOptimize() {
     }
     html += '</tbody></table>';
 
-    const fallbackNote = usedFallback
-      ? `<br><span style="color:#e67e00;font-size:13px">⚠ 천계4(슬롯4개)로 UUR 달성 불가 → 천계3(슬롯5개)으로 자동 전환</span>`
-      : '';
-
     document.getElementById('resultCard').style.display = 'block';
     document.getElementById('resultArea').innerHTML = html;
     document.getElementById('resultSummary').innerHTML =
       `총 모험가: <b>${pool0.length}명</b> &nbsp;·&nbsp; 총 포인트: <b>${pool0.reduce((a,b)=>a+b,0).toLocaleString()}</b> &nbsp;·&nbsp; 남은 모험가: <b>${pool.length}명</b> &nbsp;·&nbsp; 총 낭비: <b>${totalWaste}pt</b><br>
-       총 시간당 금화: <b style="font-size:20px;color:#c40">${totalHourly.toLocaleString()}</b>${fallbackNote}`;
+       총 시간당 금화: <b style="font-size:20px;color:#c40">${totalHourly.toLocaleString()}</b>`;
     document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth' });
   } catch(e) {
     document.getElementById('error').textContent = '에러: ' + e.message;
