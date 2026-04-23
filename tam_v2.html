@@ -530,12 +530,13 @@ function doOptimize(pool0, continents, finalContName, finalSlot) {
   let remainingRegions = continents.reduce((s,c) => s + c.regions, 0);
   for (const cont of continents) {
     const isFinalCont = cont.name === finalContName;
-    // 4슬롯 제한 시 천계1→2→3 먼저 처리하고 천계4를 마지막에 남은 풀로 채움
-    // i=0이 화면상 최고 번호(천계4)이므로 역순(3→2→1→0)으로 처리
+    // 4슬롯 제한 시 천계3→2→1 먼저 처리하고 천계4를 마지막에 남은 풀로 채움
+    // i=0=천계4, i=1=천계3, i=2=천계2, i=3=천계1 이므로 순서: [1,2,3,0]
     const reverseOrder = isFinalCont && finalSlot < SLOT;
     const contRes = new Array(cont.regions);
-    const order = Array.from({length: cont.regions}, (_, i) => i);
-    if (reverseOrder) order.reverse();
+    const order = reverseOrder
+      ? Array.from({length: cont.regions - 1}, (_, i) => i + 1).concat([0])
+      : Array.from({length: cont.regions}, (_, i) => i);
     for (const i of order) {
       remainingRegions--;
       const effectiveSlot = (isFinalCont && i === 0) ? finalSlot : SLOT;
